@@ -3,20 +3,29 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { X, Send, Bot, User, Sparkles, FileText, ChevronDown, Minimize2, Maximize2 } from 'lucide-react'
+import { X, Send, Bot, User, Sparkles, ChevronDown, Minimize2, Maximize2, Expand, Shrink } from 'lucide-react'
 
 interface Message {
   id: string
   role: 'user' | 'bot'
   content: string
   timestamp: Date
-  attachments?: { name: string; url: string }[]
+  relatedQuestions?: string[]
+}
+
+interface ChatSource {
+  type?: string
+  id?: string
+  title?: string
 }
 
 interface ChatBotProps {
   isOpen: boolean
   onClose: () => void
 }
+
+const CHAT_STREAM_URL =
+  process.env.NEXT_PUBLIC_CHAT_STREAM_URL ?? 'http://127.0.0.1:8002/api/chat/stream'
 
 const faqSuggestions = [
   '디폴트옵션이 뭔가요?',
@@ -39,6 +48,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -56,54 +66,147 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     }
   }, [isOpen])
 
-  const simulateBotResponse = (userMessage: string) => {
+  const handleToggleMinimized = () => {
+    setIsMinimized((prev) => !prev)
+  }
+
+  const handleToggleExpanded = () => {
+    setIsExpanded((prev) => !prev)
+    setIsMinimized(false)
+  }
+
+  const appendBotMessage = (
+    messageId: string,
+    content: string,
+    sources?: ChatSource[],
+    currentQuestion?: string,
+  ) => {
+    setMessages((prev) => {
+      const relatedQuestions = sources
+        ?.filter((source) => source.type === 'FAQ' && source.title && source.title !== currentQuestion)
+        .map((source) => source.title as string)
+      const existingMessage = prev.find((message) => message.id === messageId)
+
+      if (existingMessage) {
+        return prev.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                content,
+                relatedQuestions: relatedQuestions ?? message.relatedQuestions,
+              }
+            : message,
+        )
+      }
+
+      return [
+        ...prev,
+        {
+          id: messageId,
+          role: 'bot',
+          content,
+          timestamp: new Date(),
+          relatedQuestions,
+        },
+      ]
+    })
+  }
+
+  const sendMessageToAi = async (userMessage: string) => {
     setIsTyping(true)
-    
-    setTimeout(() => {
-      let response = ''
-      let attachments: { name: string; url: string }[] = []
+    const botMessageId = `bot-${Date.now()}`
+    let answer = ''
+    let pendingLine = ''
 
-      if (userMessage.includes('디폴트옵션') || userMessage.includes('사전지정')) {
-        response = '디폴트옵션(사전지정운용제도)은 DC형 퇴직연금에서 가입자가 별도의 운용 지시를 하지 않을 경우, 미리 정해진 방법으로 적립금을 운용하는 제도입니다.\n\n주요 특징:\n• 가입자의 운용 무관심으로 인한 손실 방지\n• 장기 안정적인 수익 추구\n• 고용노동부 승인 상품으로 안정성 확보\n\n디폴트옵션 지정이 필요하시면 아래 양식을 다운로드해주세요.'
-        attachments = [{ name: '디폴트옵션 지정 신청서.pdf', url: '#' }]
-      } else if (userMessage.includes('부담금') || userMessage.includes('납입')) {
-        response = 'DC형 퇴직연금 부담금 납입에 대해 안내드립니다.\n\n납입 기한:\n• 연 1회 이상 납입이 원칙\n• 월별/분기별/연별 납입 선택 가능\n\n납입 방법:\n• 가상계좌 입금\n• 자동이체 설정\n• i-ONE Bank 기업뱅킹\n\n다음 납입 예정일: 2026-05-25\n예정 금액: 125,000,000원'
-      } else if (userMessage.includes('퇴직금') || userMessage.includes('지급')) {
-        response = '퇴직금 지급 절차를 안내드립니다.\n\n필요 서류:\n1. 퇴직급여 지급 신청서\n2. 퇴직증명서 또는 사직서 사본\n3. 신분증 사본\n\n처리 기간:\n• 서류 접수 후 14일 이내 지급\n\n아래에서 필요한 양식을 다운로드하세요.'
-        attachments = [{ name: '퇴직급여 지급 신청서.pdf', url: '#' }]
-      } else if (userMessage.includes('가입자') || userMessage.includes('등록')) {
-        response = '신규 가입자 등록 방법을 안내드립니다.\n\n등록 절차:\n1. 가입자 추가 등록 신청서 작성\n2. 신규 직원 정보 입력\n3. 부담금 납입 계획 설정\n4. 디폴트옵션 지정 (DC형)\n\n필요한 서류를 첨부해드립니다.'
-        attachments = [{ name: '가입자 추가 등록 신청서.hwp', url: '#' }]
-      } else {
-        response = '네, 말씀하신 내용을 확인했습니다.\n\n더 자세한 안내가 필요하시면 구체적인 상황을 알려주시거나, 아래 문의 채널을 이용해 주세요.\n\n고객센터: 1566-2566\n담당 지점: IBK 퇴직연금센터'
+    try {
+      const response = await fetch(CHAT_STREAM_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          company_id: 'poc',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`AI API returned ${response.status}`)
       }
 
-      const botMessage: Message = {
-        id: Date.now().toString(),
-        role: 'bot',
-        content: response,
-        timestamp: new Date(),
-        attachments,
+      if (!response.body) {
+        throw new Error('AI API response stream is empty.')
       }
 
-      setMessages((prev) => [...prev, botMessage])
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+
+        pendingLine += decoder.decode(value, { stream: true })
+        const lines = pendingLine.split('\n')
+        pendingLine = lines.pop() ?? ''
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim().replace(/^data:\s*/, '')
+          if (!line) continue
+
+          const payload = JSON.parse(line)
+
+          if (payload.t) {
+            answer += payload.t
+            appendBotMessage(botMessageId, answer)
+            setIsTyping(false)
+          }
+
+          if (payload.sources) {
+            appendBotMessage(botMessageId, answer, payload.sources, userMessage)
+          }
+
+          if (payload.done) {
+            break
+          }
+        }
+      }
+
+      if (pendingLine.trim()) {
+        const payload = JSON.parse(pendingLine.trim().replace(/^data:\s*/, ''))
+        if (payload.t) {
+          answer += payload.t
+        }
+        appendBotMessage(botMessageId, answer, payload.sources, userMessage)
+      }
+
+      if (!answer.trim()) {
+        appendBotMessage(botMessageId, '응답을 받지 못했습니다. 잠시 후 다시 시도해주세요.')
+      }
+    } catch (error) {
+      console.error(error)
+      appendBotMessage(
+        botMessageId,
+        'AI 서버와 연결하지 못했습니다. AI 서버가 실행 중인지, NEXT_PUBLIC_CHAT_STREAM_URL 설정이 맞는지 확인해주세요.',
+      )
+    } finally {
       setIsTyping(false)
-    }, 1500)
+    }
   }
 
   const handleSend = () => {
-    if (!inputValue.trim()) return
+    const trimmedMessage = inputValue.trim()
+    if (!trimmedMessage) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputValue,
+      content: trimmedMessage,
       timestamp: new Date(),
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
-    simulateBotResponse(inputValue)
+    sendMessageToAi(trimmedMessage)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -116,7 +219,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
-    simulateBotResponse(suggestion)
+    sendMessageToAi(suggestion)
   }
 
   if (!isOpen) return null
@@ -125,7 +228,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-foreground/60 backdrop-blur-sm z-40 animate-fade-in"
+        className={`fixed inset-0 bg-foreground/60 backdrop-blur-sm z-40 animate-fade-in ${isExpanded ? 'bg-foreground/70' : ''}`}
         onClick={onClose}
       />
 
@@ -133,8 +236,10 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       <div className={`fixed z-50 glass-strong flex flex-col transition-all duration-500 ease-out ${
         isMinimized 
           ? 'bottom-4 right-4 w-80 h-16 rounded-2xl'
-          : 'bottom-4 right-4 w-[420px] h-[650px] rounded-3xl animate-scale-in'
-      } max-h-[calc(100vh-2rem)] shadow-2xl`}>
+          : isExpanded
+            ? 'inset-4 md:inset-6 rounded-3xl animate-scale-in'
+            : 'bottom-4 right-4 w-[min(calc(100vw-2rem),520px)] h-[min(calc(100vh-2rem),760px)] rounded-3xl animate-scale-in'
+      } shadow-2xl`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/30 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent rounded-t-3xl">
           <div className="flex items-center gap-3">
@@ -152,13 +257,27 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {!isMinimized && (
+              <button
+                type="button"
+                title={isExpanded ? '창 크기 줄이기' : '전체화면으로 보기'}
+                onClick={handleToggleExpanded}
+                className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
+              >
+                {isExpanded ? <Shrink className="w-4 h-4 text-muted-foreground" /> : <Expand className="w-4 h-4 text-muted-foreground" />}
+              </button>
+            )}
             <button
-              onClick={() => setIsMinimized(!isMinimized)}
+              type="button"
+              title={isMinimized ? '창 열기' : '창 접기'}
+              onClick={handleToggleMinimized}
               className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
             >
               {isMinimized ? <Maximize2 className="w-4 h-4 text-muted-foreground" /> : <Minimize2 className="w-4 h-4 text-muted-foreground" />}
             </button>
             <button
+              type="button"
+              title="닫기"
               onClick={onClose}
               className="p-2.5 rounded-xl hover:bg-red-100 hover:text-red-500 transition-all duration-300 hover:scale-105 active:scale-95"
             >
@@ -188,7 +307,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                       <Bot className="w-4 h-4 text-primary" />
                     )}
                   </div>
-                  <div className={`max-w-[75%] ${message.role === 'user' ? 'text-right' : ''}`}>
+                  <div className={`${isExpanded ? 'max-w-[82%]' : 'max-w-[78%]'} ${message.role === 'user' ? 'text-right' : ''}`}>
                     <div className={`p-4 rounded-2xl transition-all duration-300 hover:shadow-md ${
                       message.role === 'user'
                         ? 'bg-gradient-to-r from-primary to-accent text-white rounded-tr-sm shadow-md'
@@ -196,17 +315,20 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                     }`}>
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
-                    {message.attachments && message.attachments.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {message.attachments.map((attachment, idx) => (
-                          <a
+                    {message.relatedQuestions && message.relatedQuestions.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-xs text-muted-foreground text-left">관련 질문</p>
+                        {message.relatedQuestions.map((question, idx) => (
+                          <button
                             key={idx}
-                            href={attachment.url}
-                            className="flex items-center gap-2 p-3 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all duration-300 text-left border border-primary/20 hover:shadow-md hover-scale-sm"
+                            type="button"
+                            onClick={() => handleSuggestionClick(question)}
+                            disabled={isTyping}
+                            className="inline-flex max-w-full items-center gap-2 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-left transition-all duration-300 hover:border-primary/30 hover:bg-primary/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <FileText className="w-4 h-4 text-primary" />
-                            <span className="text-xs text-foreground font-medium">{attachment.name}</span>
-                          </a>
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
+                            <span className="truncate text-xs text-foreground">{question}</span>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -239,28 +361,28 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             </div>
 
             {/* Quick Suggestions */}
-            {messages.length <= 2 && (
-              <div className="px-4 pb-2">
-                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                  <ChevronDown className="w-3 h-3" />
-                  자주 묻는 질문
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {faqSuggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="px-3 py-2 text-xs bg-white/50 hover:bg-white/80 border border-white/50 rounded-xl text-foreground transition-all duration-300 hover:border-primary/30 hover:shadow-md hover:scale-105 active:scale-95"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
+            <div className="px-4 py-3 border-t border-white/30 bg-white/35">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                <ChevronDown className="w-3 h-3" />
+                자주 묻는 질문
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {faqSuggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    disabled={isTyping}
+                    className="px-3 py-2 text-xs bg-white/70 hover:bg-white/95 border border-white/70 rounded-xl text-foreground shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-white/30">
+            <div className="p-4 border-t border-white/30 bg-white/40">
               <form
                 onSubmit={(e) => {
                   e.preventDefault()
@@ -287,7 +409,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                 </Button>
               </form>
               <p className="text-xs text-muted-foreground text-center mt-3">
-                i-ONE Bank 기업 퇴직연금 AI 상담
+                IBK 퇴직연금 관리시스템
               </p>
             </div>
           </>
