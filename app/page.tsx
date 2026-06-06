@@ -10,14 +10,37 @@ export default function LoginPage() {
   const [businessNumber, setBusinessNumber] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
-    setTimeout(() => {
+    setErrorMessage('')
+
+    const brn = businessNumber.replace(/-/g, '')
+
+    try {
+      const res = await fetch('http://localhost:8080/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brn, password }),
+      })
+
+      if (!res.ok) {
+        const msg = await res.text()
+        setErrorMessage(msg || '로그인에 실패했습니다.')
+        return
+      }
+
+      const data = await res.json()
+      localStorage.setItem('token', data.token)
       router.push('/dashboard')
-    }, 1000)
+    } catch {
+      setErrorMessage('서버에 연결할 수 없습니다.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const formatBusinessNumber = (value: string) => {
@@ -147,6 +170,10 @@ export default function LoginPage() {
                   />
                 </div>
               </div>
+
+              {errorMessage && (
+                <p className="text-sm text-red-400 text-center">{errorMessage}</p>
+              )}
 
               <Button
                 type="submit"
