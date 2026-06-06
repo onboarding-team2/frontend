@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     setErrorMessage('')
@@ -35,7 +35,9 @@ export default function LoginPage() {
 
       const data = await res.json()
       localStorage.setItem('token', data.token)
-      router.push('/dashboard')
+      localStorage.setItem('planType', data.planType)
+      const plan = (data.planType as string)?.toLowerCase() ?? 'dc'
+      router.push(`/pension/${plan}/dashboard`)
     } catch {
       setErrorMessage('서버에 연결할 수 없습니다.')
     } finally {

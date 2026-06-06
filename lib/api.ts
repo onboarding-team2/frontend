@@ -2,6 +2,63 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 
 export const DEMO_COMPANY_ID = 'C005'
 
+function authHeaders(): HeadersInit {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export function getPlanType(): 'DC' | 'DB' | 'IRP' | null {
+  if (typeof window === 'undefined') return null
+  return (localStorage.getItem('planType') as 'DC' | 'DB' | 'IRP' | null)
+}
+
+export type MonthlyPayment = {
+  month: number
+  amount: number | null
+  paid: boolean
+}
+
+export type DcContributionStatus = {
+  year: number
+  expectedAmount: number
+  payments: MonthlyPayment[]
+}
+
+export type ExpectedRetiree = {
+  rank: number
+  name: string
+  memberId: string
+  retirementDate: string
+  retirementType: string | null
+}
+
+async function pensionFetch(path: string, signal?: AbortSignal): Promise<unknown> {
+  const planType = getPlanType()?.toLowerCase() ?? 'dc'
+  const res = await fetch(`${API_BASE}/pension/${planType}${path}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, `${path} 조회 실패`))
+  return res.json()
+}
+
+export async function getPensionDashboard(signal?: AbortSignal): Promise<DcContributionStatus> {
+  return pensionFetch('/dashboard', signal) as Promise<DcContributionStatus>
+}
+
+export async function getPensionMembers(signal?: AbortSignal): Promise<unknown> {
+  return pensionFetch('/members', signal)
+}
+
+export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
+  return pensionFetch('/deadlines', signal) as Promise<ExpectedRetiree[]>
+}
+
+export async function getPensionDocuments(signal?: AbortSignal): Promise<unknown> {
+  return pensionFetch('/documents', signal)
+}
+
 export type PlanType = 'DC' | 'DB' | 'IRP'
 export type EmployeeStatus = '재직' | '퇴직'
 
