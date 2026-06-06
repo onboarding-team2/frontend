@@ -1,7 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, Users, Wallet, AlertTriangle, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
+import { getPensionDashboard, getPensionDeadlines, type DcContributionStatus, type ExpectedRetiree } from '@/lib/api'
+
+const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
 
 const statsCards = [
   {
@@ -46,21 +50,23 @@ const statsCards = [
   },
 ]
 
-const upcomingRetirements = [
-  { name: '홍길동', employeeId: 'E001', expectedDate: '2026-06-15', type: '정년퇴직' },
-  { name: '김영희', employeeId: 'E002', expectedDate: '2026-07-20', type: '희망퇴직' },
-  { name: '이철수', employeeId: 'E003', expectedDate: '2026-08-01', type: '정년퇴직' },
-]
-
-const contributionData = [
-  { month: '1월', planned: 120, actual: 115 },
-  { month: '2월', planned: 120, actual: 122 },
-  { month: '3월', planned: 120, actual: 118 },
-  { month: '4월', planned: 120, actual: 125 },
-  { month: '5월', planned: 120, actual: 0 },
-]
-
 export function DashboardOverview() {
+  const [contribution, setContribution] = useState<DcContributionStatus | null>(null)
+  const [retirees, setRetirees] = useState<ExpectedRetiree[] | null>(null)
+
+  useEffect(() => {
+    const ac = new AbortController()
+    getPensionDashboard(ac.signal).then(setContribution).catch(() => {})
+    getPensionDeadlines(ac.signal).then(setRetirees).catch(() => {})
+    return () => ac.abort()
+  }, [])
+
+  const contributionData = contribution?.payments.map(p => ({
+    month: MONTH_LABELS[(p.month ?? 1) - 1],
+    planned: contribution.expectedAmount / 1_000_000,
+    actual: p.paid && p.amount != null ? p.amount / 1_000_000 : 0,
+  })) ?? null
+
   return (
     <div className="space-y-6">
       {/* Welcome Hero */}
@@ -131,7 +137,7 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {contributionData.map((data, idx) => (
+              {(contributionData ?? []).map((data, idx) => (
                 <div key={data.month} className="flex items-center gap-4 group">
                   <span className="w-12 text-sm text-muted-foreground font-medium">{data.month}</span>
                   <div className="flex-1 h-10 bg-white/50 rounded-xl overflow-hidden relative">
@@ -196,9 +202,9 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {upcomingRetirements.map((person, idx) => (
+              {(retirees ?? []).map((person, idx) => (
                 <div
-                  key={person.employeeId}
+                  key={person.memberId}
                   className="flex items-center justify-between p-4 bg-white/50 rounded-xl hover:bg-white/80 transition-all duration-300 cursor-pointer hover:shadow-md hover-scale-sm"
                 >
                   <div className="flex items-center gap-3">
@@ -207,12 +213,12 @@ export function DashboardOverview() {
                     </div>
                     <div>
                       <p className="font-semibold text-foreground">{person.name}</p>
-                      <p className="text-xs text-muted-foreground">{person.employeeId}</p>
+                      <p className="text-xs text-muted-foreground">{person.memberId}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">{person.expectedDate}</p>
-                    <p className="text-xs text-muted-foreground">{person.type}</p>
+                    <p className="text-sm font-medium text-foreground">{person.retirementDate}</p>
+                    <p className="text-xs text-muted-foreground">{person.retirementType}</p>
                   </div>
                 </div>
               ))}
