@@ -1,5 +1,5 @@
-import { DashboardOverview } from '@/components/dashboard/overview'
+import { DCOverview } from '@/components/dashboard/dc-overview'
 
 export default function DCDashboard() {
-  return <DashboardOverview />
+  return <DCOverview />
 }

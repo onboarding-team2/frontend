@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Bell, MessageCircle, Menu, Sparkles, Check, AlertTriangle, Clock, Info } from 'lucide-react'
+import { Bell, MessageCircle, Menu, Search, Sparkles, Check, AlertTriangle, Clock, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface HeaderProps {
   onChatOpen: () => void
@@ -102,14 +103,24 @@ export function Header({ onChatOpen }: HeaderProps) {
   }
 
   return (
-    <header className="glass-strong border-b border-white/30 px-6 py-4 relative z-50">
+    <header className="glass-strong border-b border-white/30 px-6 py-4">
       <div className="flex items-center justify-between">
         {/* Mobile Menu */}
         <button className="md:hidden p-2 rounded-lg hover:bg-white/50 transition-colors">
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex-1" />
+        {/* Search */}
+        <div className="hidden md:flex items-center flex-1 max-w-md">
+          <div className="relative w-full group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+            <Input
+              type="text"
+              placeholder="검색어를 입력하세요..."
+              className="pl-11 h-11 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
+            />
+          </div>
+        </div>
 
         {/* Actions */}
         <div className="flex items-center gap-3">
@@ -129,7 +140,7 @@ export function Header({ onChatOpen }: HeaderProps) {
 
             {/* Notification Dropdown */}
             {isNotificationOpen && (
-              <div className="absolute right-0 top-full mt-2 w-96 bg-white/94 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 overflow-hidden z-70 animate-scale-in">
+              <div className="absolute right-0 top-full mt-2 w-96 glass-strong rounded-2xl shadow-2xl border border-white/30 overflow-hidden z-50 animate-scale-in">
                 <div className="p-4 border-b border-white/30 flex items-center justify-between">
                   <h3 className="font-semibold text-foreground">알림</h3>
                   {unreadCount > 0 && (
