@@ -3,7 +3,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { X, Send, Bot, User, Sparkles, ChevronDown, Minimize2, Maximize2, Expand, Shrink } from 'lucide-react'
+import {
+  X, Send, Bot, User, Sparkles, FileText,
+  ChevronDown, Minimize2, Maximize2, Expand, Shrink,
+} from 'lucide-react'
 
 interface Message {
   id: string
@@ -11,6 +14,7 @@ interface Message {
   content: string
   timestamp: Date
   relatedQuestions?: string[]
+  attachments?: { name: string; url: string }[]
 }
 
 interface ChatSource {
@@ -56,19 +60,13 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+  useEffect(() => { scrollToBottom() }, [messages])
 
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus()
-    }
+    if (isOpen && inputRef.current) inputRef.current.focus()
   }, [isOpen])
 
-  const handleToggleMinimized = () => {
-    setIsMinimized((prev) => !prev)
-  }
+  const handleToggleMinimized = () => setIsMinimized((prev) => !prev)
 
   const handleToggleExpanded = () => {
     setIsExpanded((prev) => !prev)
@@ -80,25 +78,26 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     content: string,
     sources?: ChatSource[],
     currentQuestion?: string,
+    attachments?: { name: string; url: string }[],
   ) => {
     setMessages((prev) => {
       const relatedQuestions = sources
-        ?.filter((source) => source.type === 'FAQ' && source.title && source.title !== currentQuestion)
-        .map((source) => source.title as string)
-      const existingMessage = prev.find((message) => message.id === messageId)
+        ?.filter((s) => s.type === 'FAQ' && s.title && s.title !== currentQuestion)
+        .map((s) => s.title as string)
 
-      if (existingMessage) {
-        return prev.map((message) =>
-          message.id === messageId
+      const existing = prev.find((m) => m.id === messageId)
+      if (existing) {
+        return prev.map((m) =>
+          m.id === messageId
             ? {
-                ...message,
+                ...m,
                 content,
-                relatedQuestions: relatedQuestions ?? message.relatedQuestions,
+                relatedQuestions: relatedQuestions ?? m.relatedQuestions,
+                attachments: attachments ?? m.attachments,
               }
-            : message,
+            : m,
         )
       }
-
       return [
         ...prev,
         {
@@ -107,6 +106,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           content,
           timestamp: new Date(),
           relatedQuestions,
+          attachments,
         },
       ]
     })
@@ -121,22 +121,12 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     try {
       const response = await fetch(CHAT_STREAM_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          company_id: 'poc',
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage, company_id: 'poc' }),
       })
 
-      if (!response.ok) {
-        throw new Error(`AI API returned ${response.status}`)
-      }
-
-      if (!response.body) {
-        throw new Error('AI API response stream is empty.')
-      }
+      if (!response.ok) throw new Error(`AI API returned ${response.status}`)
+      if (!response.body) throw new Error('AI API response stream is empty.')
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -154,28 +144,21 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           if (!line) continue
 
           const payload = JSON.parse(line)
-
           if (payload.t) {
             answer += payload.t
             appendBotMessage(botMessageId, answer)
             setIsTyping(false)
           }
-
           if (payload.sources) {
             appendBotMessage(botMessageId, answer, payload.sources, userMessage)
           }
-
-          if (payload.done) {
-            break
-          }
+          if (payload.done) break
         }
       }
 
       if (pendingLine.trim()) {
         const payload = JSON.parse(pendingLine.trim().replace(/^data:\s*/, ''))
-        if (payload.t) {
-          answer += payload.t
-        }
+        if (payload.t) answer += payload.t
         appendBotMessage(botMessageId, answer, payload.sources, userMessage)
       }
 
@@ -194,31 +177,17 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   }
 
   const handleSend = () => {
-    const trimmedMessage = inputValue.trim()
-    if (!trimmedMessage) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: trimmedMessage,
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
+    const trimmed = inputValue.trim()
+    if (!trimmed) return
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: trimmed, timestamp: new Date() }
+    setMessages((prev) => [...prev, userMsg])
     setInputValue('')
-    sendMessageToAi(trimmedMessage)
+    sendMessageToAi(trimmed)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: suggestion,
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInputValue('')
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: suggestion, timestamp: new Date() }
+    setMessages((prev) => [...prev, userMsg])
     sendMessageToAi(suggestion)
   }
 
@@ -226,22 +195,21 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
   return (
     <>
-      {/* Backdrop */}
-      <div 
-        className={`fixed inset-0 bg-foreground/60 backdrop-blur-sm z-40 animate-fade-in ${isExpanded ? 'bg-foreground/70' : ''}`}
-        onClick={onClose}
-      />
-
-      {/* Chat Window */}
-      <div className={`fixed z-50 glass-strong flex flex-col transition-all duration-500 ease-out ${
-        isMinimized 
-          ? 'bottom-4 right-4 w-80 h-16 rounded-2xl'
-          : isExpanded
-            ? 'inset-4 md:inset-6 rounded-3xl animate-scale-in'
-            : 'bottom-4 right-4 w-[min(calc(100vw-2rem),520px)] h-[min(calc(100vh-2rem),760px)] rounded-3xl animate-scale-in'
-      } shadow-2xl`}>
+      {/* Chat Window – RIGHT UI: solid white, real shadow, no backdrop */}
+      <div
+        className={`fixed z-50 flex flex-col transition-all duration-500 ease-out overflow-hidden border border-slate-200/60 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] ${
+          isMinimized
+            ? 'bottom-6 right-6 w-80 h-[68px] rounded-2xl glass-strong'
+            : isExpanded
+              ? 'inset-4 md:inset-6 rounded-3xl bg-white'
+              : 'bottom-6 right-6 w-[420px] h-[650px] rounded-3xl bg-white'
+        } max-h-[calc(100vh-2rem)]`}
+        style={!isMinimized ? { backgroundColor: '#ffffff', opacity: 1 } : undefined}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/30 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent rounded-t-3xl">
+        <div className={`flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent shrink-0 transition-all ${
+          isMinimized ? 'border-b-0 h-full' : 'border-b border-slate-100'
+        }`}>
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-blue transition-transform duration-300 hover:scale-105">
               <Bot className="w-5 h-5 text-white" />
@@ -264,7 +232,9 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                 onClick={handleToggleExpanded}
                 className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
               >
-                {isExpanded ? <Shrink className="w-4 h-4 text-muted-foreground" /> : <Expand className="w-4 h-4 text-muted-foreground" />}
+                {isExpanded
+                  ? <Shrink className="w-4 h-4 text-muted-foreground" />
+                  : <Expand className="w-4 h-4 text-muted-foreground" />}
               </button>
             )}
             <button
@@ -273,7 +243,9 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
               onClick={handleToggleMinimized}
               className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
             >
-              {isMinimized ? <Maximize2 className="w-4 h-4 text-muted-foreground" /> : <Minimize2 className="w-4 h-4 text-muted-foreground" />}
+              {isMinimized
+                ? <Maximize2 className="w-4 h-4 text-muted-foreground" />
+                : <Minimize2 className="w-4 h-4 text-muted-foreground" />}
             </button>
             <button
               type="button"
@@ -301,13 +273,11 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                       ? 'bg-gradient-to-br from-primary to-accent shadow-md'
                       : 'bg-gradient-to-br from-primary/20 to-accent/20'
                   }`}>
-                    {message.role === 'user' ? (
-                      <User className="w-4 h-4 text-white" />
-                    ) : (
-                      <Bot className="w-4 h-4 text-primary" />
-                    )}
+                    {message.role === 'user'
+                      ? <User className="w-4 h-4 text-white" />
+                      : <Bot className="w-4 h-4 text-primary" />}
                   </div>
-                  <div className={`${isExpanded ? 'max-w-[82%]' : 'max-w-[78%]'} ${message.role === 'user' ? 'text-right' : ''}`}>
+                  <div className={`${isExpanded ? 'max-w-[82%]' : 'max-w-[75%]'} ${message.role === 'user' ? 'text-right' : ''}`}>
                     <div className={`p-4 rounded-2xl transition-all duration-300 hover:shadow-md ${
                       message.role === 'user'
                         ? 'bg-gradient-to-r from-primary to-accent text-white rounded-tr-sm shadow-md'
@@ -315,12 +285,30 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                     }`}>
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
+
+                    {/* 파일 첨부 (우측 UI) */}
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {message.attachments.map((attachment, i) => (
+                          <a
+                            key={i}
+                            href={attachment.url}
+                            className="flex items-center gap-2 p-3 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all duration-300 text-left border border-primary/20 hover:shadow-md"
+                          >
+                            <FileText className="w-4 h-4 text-primary" />
+                            <span className="text-xs text-foreground font-medium">{attachment.name}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 관련 질문 (좌측 AI 응답) */}
                     {message.relatedQuestions && message.relatedQuestions.length > 0 && (
                       <div className="mt-2 space-y-2">
                         <p className="text-xs text-muted-foreground text-left">관련 질문</p>
-                        {message.relatedQuestions.map((question, idx) => (
+                        {message.relatedQuestions.map((question, i) => (
                           <button
-                            key={idx}
+                            key={i}
                             type="button"
                             onClick={() => handleSuggestionClick(question)}
                             disabled={isTyping}
@@ -332,11 +320,9 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                         ))}
                       </div>
                     )}
+
                     <p className="text-xs text-muted-foreground mt-2">
-                      {message.timestamp.toLocaleTimeString('ko-KR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {message.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -356,38 +342,36 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                   </div>
                 </div>
               )}
-
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Quick Suggestions */}
-            <div className="px-4 py-3 border-t border-white/30 bg-white/35">
-              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-                <ChevronDown className="w-3 h-3" />
-                자주 묻는 질문
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {faqSuggestions.map((suggestion, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    disabled={isTyping}
-                    className="px-3 py-2 text-xs bg-white/70 hover:bg-white/95 border border-white/70 rounded-xl text-foreground shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+            {/* 자주 묻는 질문 – 메시지 2개 이하일 때만 표시 (우측 UI) */}
+            {messages.length <= 2 && (
+              <div className="px-4 pb-2">
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                  <ChevronDown className="w-3 h-3" />
+                  자주 묻는 질문
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {faqSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      disabled={isTyping}
+                      className="px-3 py-2 text-xs bg-white/50 hover:bg-white/80 border border-white/50 rounded-xl text-foreground transition-all duration-300 hover:border-primary/30 hover:shadow-md hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Input */}
-            <div className="p-4 border-t border-white/30 bg-white/40">
+            <div className="p-4 border-t border-white/30">
               <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  handleSend()
-                }}
+                onSubmit={(e) => { e.preventDefault(); handleSend() }}
                 className="flex items-center gap-3"
               >
                 <Input
@@ -409,7 +393,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                 </Button>
               </form>
               <p className="text-xs text-muted-foreground text-center mt-3">
-                IBK 퇴직연금 관리시스템
+                i-ONE Bank 기업 퇴직연금 AI 상담
               </p>
             </div>
           </>
