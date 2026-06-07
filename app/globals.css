@@ -107,6 +107,9 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+  scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
     background-image: 
@@ -115,6 +118,11 @@
       radial-gradient(ellipse at center, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
     background-attachment: fixed;
   }
+}
+
+.overflow-auto,
+.overflow-y-auto {
+  scrollbar-gutter: stable;
 }
 
 /* Gradient text */

@@ -1,6 +1,7 @@
 'use client'
 
 import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { TabType } from '@/lib/types'
 
 interface SidebarProps {
@@ -11,11 +12,19 @@ interface SidebarProps {
 const menuItems = [
   { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
-  { id: 'deadlines' as TabType, label: '기일 도래', icon: CalendarDays },
+  { id: 'deadlines' as TabType, label: '기일 관리', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
 ]
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const router = useRouter()
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('planType')
+    router.push('/')
+  }
+
   return (
     <aside className="hidden md:flex w-72 glass-strong border-r border-white/30 flex-col sticky top-0 h-screen">
       {/* Logo */}
@@ -89,7 +98,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       {/* Logout */}
       <div className="p-4 border-t border-white/30">
-        <button className="btn-hover w-full flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
+        <button
+          onClick={handleLogout}
+          className="btn-hover w-full flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+        >
           <LogOut className="w-5 h-5" />
           <span className="font-medium">로그아웃</span>
         </button>

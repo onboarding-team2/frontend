@@ -15,12 +15,12 @@ export default function DashboardLayout({
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       <Suspense fallback={null}>
         <SidebarWithRouting />
       </Suspense>
 
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-0">
         <Header onChatOpen={() => setIsChatOpen(true)} />
         <main className="flex-1 p-6 overflow-auto">{children}</main>
       </div>
