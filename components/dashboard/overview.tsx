@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, Users, Wallet, AlertTriangle, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
-import { getPensionDashboard, getPensionDeadlines, type DcContributionStatus, type ExpectedRetiree } from '@/lib/api'
+import { getPensionDashboard, getPensionSchedules, type DcContributionStatus, type ExpectedRetiree } from '@/lib/api'
 
 const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
 
@@ -57,7 +57,7 @@ export function DashboardOverview() {
   useEffect(() => {
     const ac = new AbortController()
     getPensionDashboard(ac.signal).then(setContribution).catch(() => {})
-    getPensionDeadlines(ac.signal).then(setRetirees).catch(() => {})
+    getPensionSchedules(ac.signal).then(setRetirees).catch(() => {})
     return () => ac.abort()
   }, [])
 

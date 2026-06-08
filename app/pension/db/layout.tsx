@@ -30,8 +30,8 @@ function DBSidebar() {
 
   const activeTab: TabType = pathname.endsWith('/members')
     ? 'members'
-    : pathname.endsWith('/deadlines')
-    ? 'deadlines'
+    : pathname.endsWith('/schedules')
+    ? 'schedules'
     : pathname.endsWith('/documents')
     ? 'documents'
     : 'overview'

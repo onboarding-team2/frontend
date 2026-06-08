@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { DashboardOverview } from '@/components/dashboard/overview'
 import { MemberManagement } from '@/components/dashboard/member-management'
-import { DeadlineAlerts } from '@/components/dashboard/deadline-alerts'
+import { ScheduleManagement } from '@/components/dashboard/schedule-management'
 import { DocumentForms } from '@/components/dashboard/document-forms'
 import type { TabType } from '@/lib/types'
 
@@ -24,8 +24,8 @@ function TabRouter() {
     switch (tab) {
       case 'members':
         return <MemberManagement />
-      case 'deadlines':
-        return <DeadlineAlerts />
+      case 'schedules':
+        return <ScheduleManagement />
       case 'documents':
         return <DocumentForms />
       case 'overview':

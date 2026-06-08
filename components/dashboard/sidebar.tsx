@@ -12,7 +12,7 @@ interface SidebarProps {
 const menuItems = [
   { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
-  { id: 'deadlines' as TabType, label: '기일 관리', icon: CalendarDays },
+  { id: 'schedules' as TabType, label: '기일 관리', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
 ]
 
