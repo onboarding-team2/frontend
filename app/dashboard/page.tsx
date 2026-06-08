@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { DashboardOverview } from '@/components/dashboard/overview'
+import { DBOverview } from '@/components/dashboard/db-overview'
 import { MemberManagement } from '@/components/dashboard/member-management'
 import { DeadlineAlerts } from '@/components/dashboard/deadline-alerts'
 import { DocumentForms } from '@/components/dashboard/document-forms'
