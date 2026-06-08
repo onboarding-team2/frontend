@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, Users, Wallet, AlertTriangle, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
-import { getPensionDashboard, getPensionDeadlines, type DcContributionStatus, type ExpectedRetiree } from '@/lib/api'
+import { getPensionDeadlines, type ExpectedRetiree } from '@/lib/api'
 
-const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
 
 const statsCards = [
   {
@@ -51,21 +50,13 @@ const statsCards = [
 ]
 
 export function DashboardOverview() {
-  const [contribution, setContribution] = useState<DcContributionStatus | null>(null)
   const [retirees, setRetirees] = useState<ExpectedRetiree[] | null>(null)
 
   useEffect(() => {
     const ac = new AbortController()
-    getPensionDashboard(ac.signal).then(setContribution).catch(() => {})
     getPensionDeadlines(ac.signal).then(setRetirees).catch(() => {})
     return () => ac.abort()
   }, [])
-
-  const contributionData = contribution?.payments.map(p => ({
-    month: MONTH_LABELS[(p.month ?? 1) - 1],
-    planned: contribution.expectedAmount / 1_000_000,
-    actual: p.paid && p.amount != null ? p.amount / 1_000_000 : 0,
-  })) ?? null
 
   return (
     <div className="space-y-6">
@@ -137,7 +128,7 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(contributionData ?? []).map((data, idx) => (
+              {([] as { month: string; planned: number; actual: number }[]).map((data, idx) => (
                 <div key={data.month} className="flex items-center gap-4 group">
                   <span className="w-12 text-sm text-muted-foreground font-medium">{data.month}</span>
                   <div className="flex-1 h-10 bg-white/50 rounded-xl overflow-hidden relative">
