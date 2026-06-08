@@ -12,10 +12,18 @@ export function getPlanType(): 'DC' | 'DB' | 'IRP' | null {
   return (localStorage.getItem('planType') as 'DC' | 'DB' | 'IRP' | null)
 }
 
+export type DefaultOptionMember = {
+  name: string
+  join_date: string
+  days_elapsed: number
+}
+
 export type DcDashboard = {
   total_balance: number
   total_employee: number
   default_option_not_selected: number
+  default_option_members: DefaultOptionMember[]
+  default_option_summary: string | null
   this_month_contribution: number
   contribution_due_date: string | null
 }
@@ -45,6 +53,12 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashb
     total_balance: (r.total_balance ?? r.totalBalance ?? 0) as number,
     total_employee: (r.total_employee ?? r.totalEmployee ?? 0) as number,
     default_option_not_selected: (r.default_option_not_selected ?? r.defaultOptionNotSelected ?? 0) as number,
+    default_option_members: ((r.default_option_members ?? r.defaultOptionMembers ?? []) as Record<string, unknown>[]).map((m) => ({
+      name: m.name as string,
+      join_date: (m.join_date ?? m.joinDate ?? '') as string,
+      days_elapsed: (m.days_elapsed ?? m.daysElapsed ?? 0) as number,
+    })),
+    default_option_summary: (r.default_option_summary ?? r.defaultOptionSummary ?? null) as string | null,
     this_month_contribution: (r.this_month_contribution ?? r.thisMonthContribution ?? 0) as number,
     contribution_due_date: (r.contribution_due_date ?? r.contributionDueDate ?? null) as string | null,
   }
