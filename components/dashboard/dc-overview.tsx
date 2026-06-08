@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, Users, Wallet, AlertTriangle, Sparkles, CalendarClock, ShieldAlert, FileX, ShoppingCart, RefreshCw, ChevronRight, Loader2 } from 'lucide-react'
+import { TrendingUp, Users, Wallet, AlertTriangle, Sparkles, CalendarClock, ShieldAlert, FileX, ChevronRight } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { getPensionDashboard, DcDashboard } from '@/lib/api'
 
 function toEok(amount: number): string {
@@ -23,45 +24,10 @@ const contributionData = [
   { month: '5월', planned: 120, actual: 0 },
 ]
 
-const staticUnprocessedItems = [
-  {
-    title: 'IRP 개설 미완료',
-    count: 3,
-    icon: FileX,
-    iconGradient: 'from-rose-500 to-red-400',
-    rows: [
-      { name: '최영호', dateLabel: '퇴직일 2025.04.30', badge: '지급 지연', badgeType: 'danger' },
-      { name: '오은서', dateLabel: '퇴직일 2025.05.02', badge: '지급 지연', badgeType: 'danger' },
-      { name: '강태양', dateLabel: '퇴직일 2025.05.10', badge: '확인 필요', badgeType: 'warning' },
-    ],
-    extra: null,
-  },
-  {
-    title: '매수예정 상품 미등록',
-    count: 8,
-    icon: ShoppingCart,
-    iconGradient: 'from-sky-500 to-blue-400',
-    rows: [
-      { name: '정다은', dateLabel: '운용지시 2025.04.28', badge: '매수 미완료', badgeType: 'warning' },
-      { name: '한승우', dateLabel: '운용지시 2025.05.03', badge: '매수 미완료', badgeType: 'warning' },
-    ],
-    extra: '윤지수 외 6명',
-  },
-  {
-    title: '만기 후 재투자 미지시',
-    count: 5,
-    icon: RefreshCw,
-    iconGradient: 'from-violet-500 to-purple-400',
-    rows: [
-      { name: '임채원', dateLabel: '만기일 2025.04.15', badge: '46일 방치', badgeType: 'danger' },
-      { name: '신예린', dateLabel: '만기일 2025.05.01', badge: '30일 방치', badgeType: 'danger' },
-    ],
-    extra: '조현준 외 3명',
-  },
-]
-
 export function DCOverview() {
   const [data, setData] = useState<DcDashboard | null>(null)
+
+  const totalMembers = data?.total_employee ?? 0
 
   const unprocessedItems = [
     {
@@ -69,15 +35,19 @@ export function DCOverview() {
       count: data?.default_option_not_selected ?? 0,
       icon: AlertTriangle,
       iconGradient: 'from-amber-500 to-orange-400',
-      rows: (data?.default_option_members ?? []).slice(0, 2).map((m) => ({
-        name: m.name,
-        dateLabel: `가입일 ${m.join_date.replace(/-/g, '.')}`,
-        badge: `${m.days_elapsed}일 경과`,
-        badgeType: 'danger',
-      })),
-      extra: data?.default_option_summary ?? null,
+      chartColor: '#f59e0b',
+      incompleteLabel: '미선정',
+      completeLabel: '선정 완료',
     },
-    ...staticUnprocessedItems,
+    {
+      title: 'IRP 개설 미완료',
+      count: data?.irp_not_opened ?? 0,
+      icon: FileX,
+      iconGradient: 'from-rose-500 to-red-400',
+      chartColor: '#f43f5e',
+      incompleteLabel: '미완료',
+      completeLabel: '개설 완료',
+    },
   ]
 
   useEffect(() => {
@@ -207,6 +177,13 @@ export function DCOverview() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {unprocessedItems.map((item, idx) => {
               const Icon = item.icon
+              const incomplete = item.count
+              const complete = Math.max(totalMembers - incomplete, 0)
+              const percent = totalMembers > 0 ? ((incomplete / totalMembers) * 100).toFixed(1) : '0.0'
+              const chartData = [
+                { name: item.incompleteLabel, value: incomplete, color: item.chartColor },
+                { name: item.completeLabel, value: complete, color: '#e2e8f0' },
+              ]
               return (
                 <div
                   key={item.title}
@@ -222,21 +199,59 @@ export function DCOverview() {
                     </div>
                     <span className="text-sm font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-muted-foreground">{item.count}명</span>
                   </div>
-                  <div className="space-y-2.5">
-                    {item.rows.map((row) => (
-                      <div key={row.name} className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-foreground w-16">{row.name}</span>
-                        <span className="text-muted-foreground flex-1 text-right mr-3">{row.dateLabel}</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${
-                          row.badgeType === 'danger' ? 'bg-red-100 text-red-500' : 'bg-amber-100 text-amber-600'
-                        }`}>
-                          {row.badge}
-                        </span>
+
+                  <div className="flex items-center gap-5">
+                    <div className="relative w-32 h-32 shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={chartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={42}
+                            outerRadius={60}
+                            startAngle={90}
+                            endAngle={-270}
+                            paddingAngle={2}
+                            stroke="none"
+                          >
+                            {chartData.map((entry) => (
+                              <Cell key={entry.name} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-2xl font-bold text-foreground leading-none">{percent}%</span>
+                        <span className="text-[11px] text-muted-foreground mt-0.5">{item.incompleteLabel}</span>
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.chartColor }} />
+                          <span className="text-muted-foreground">{item.incompleteLabel}</span>
+                        </div>
+                        <span className="font-semibold text-foreground">{incomplete.toLocaleString()}명</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-slate-200" />
+                          <span className="text-muted-foreground">{item.completeLabel}</span>
+                        </div>
+                        <span className="font-semibold text-foreground">{complete.toLocaleString()}명</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 mt-1 border-t border-white/50 text-sm">
+                        <span className="text-muted-foreground">총 가입자</span>
+                        <span className="font-semibold text-foreground">{totalMembers.toLocaleString()}명</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/50">
-                    <span className="text-sm text-muted-foreground">{item.extra ?? ''}</span>
+
+                  <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/50">
                     <button className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all">
                       목록 전체 보기
                       <ChevronRight className="w-4 h-4" />
