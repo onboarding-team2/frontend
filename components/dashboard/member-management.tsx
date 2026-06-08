@@ -16,9 +16,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import {
-  DEMO_COMPANY_ID,
   Employee,
-  getEmployees,
+  getPensionMembers,
 } from '@/lib/api'
 
 const PAGE_SIZE = 20
@@ -52,17 +51,10 @@ export function MemberManagement() {
     setIsLoading(true)
     setError(null)
 
-    getEmployees({
-      companyId: DEMO_COMPANY_ID,
-      name: searchKeyword || undefined,
-      status: status === 'ALL' ? undefined : status,
-      page,
-      size: PAGE_SIZE,
-      signal: ctrl.signal,
-    })
+    getPensionMembers(ctrl.signal)
       .then((res) => {
-        setMembers(res.members)
-        setTotalCount(res.totalCount)
+        setMembers(res ?? [])
+        setTotalCount(res?.length ?? 0)
       })
       .catch((e: unknown) => {
         if (e instanceof DOMException && e.name === 'AbortError') return
@@ -180,7 +172,6 @@ export function MemberManagement() {
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">이름</th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">직위</th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">가입일</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">제도</th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">부담금</th>
                   <th className="text-right p-4 text-sm font-medium text-muted-foreground">적립금</th>
                   <th className="text-center p-4 text-sm font-medium text-muted-foreground">상태</th>
@@ -189,14 +180,14 @@ export function MemberManagement() {
               <tbody>
                 {isLoading && members.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    <td colSpan={6} className="p-12 text-center text-muted-foreground">
                       <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
                       불러오는 중...
                     </td>
                   </tr>
                 ) : members.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    <td colSpan={6} className="p-12 text-center text-muted-foreground">
                       조회된 가입자가 없습니다.
                     </td>
                   </tr>
@@ -219,32 +210,21 @@ export function MemberManagement() {
                         </div>
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">{m.position ?? '-'}</td>
-                      <td className="p-4 text-sm text-muted-foreground">{m.joinDate ?? '-'}</td>
+                      <td className="p-4 text-sm text-muted-foreground">{m.startDate ?? '-'}</td>
                       <td className="p-4">
-                        {m.planType ? (
+                        {m.contributionPaid != null ? (
                           <span
-                            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-300 hover:scale-105 ${
-                              m.planType === 'DC'
-                                ? 'bg-primary/15 text-primary'
-                                : 'bg-accent/15 text-accent'
+                            className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                              m.contributionPaid
+                                ? 'bg-emerald-100 text-emerald-600'
+                                : 'bg-red-100 text-red-500'
                             }`}
                           >
-                            {m.planType}형
+                            {m.contributionPaid ? '납입' : '미납'}
                           </span>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                            m.contributionPaid
-                              ? 'bg-emerald-100 text-emerald-600'
-                              : 'bg-red-100 text-red-500'
-                          }`}
-                        >
-                          {m.contributionPaid ? '납입' : '미납'}
-                        </span>
                       </td>
                       <td className="p-4 text-sm text-right font-medium text-foreground">
                         {m.balance != null ? `${m.balance.toLocaleString()}원` : '-'}

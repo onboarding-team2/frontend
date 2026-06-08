@@ -47,8 +47,17 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcContr
   return pensionFetch('/dashboard', signal) as Promise<DcContributionStatus>
 }
 
-export async function getPensionMembers(signal?: AbortSignal): Promise<unknown> {
-  return pensionFetch('/members', signal)
+export async function getPensionMembers(signal?: AbortSignal): Promise<Employee[]> {
+  const result = await pensionFetch('/members', signal) as Record<string, unknown>[]
+  return result.map((item) => ({
+    id: item.id as number,
+    name: item.name as string,
+    position: (item.position as string) ?? null,
+    startDate: ((item.startDate ?? item.start_date) as string) ?? null,
+    balance: (item.balance as number) ?? null,
+    contributionPaid: (item.contributionPaid as boolean) ?? null,
+    status: (item.status as EmployeeStatus) ?? null,
+  }))
 }
 
 export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
@@ -64,13 +73,11 @@ export type EmployeeStatus = '재직' | '퇴직'
 
 export type Employee = {
   id: number
-  memberId: string
   name: string
   position: string | null
-  joinDate: string | null
-  planType: PlanType | null
+  startDate: string | null
   balance: number | null
-  contributionPaid: boolean
+  contributionPaid: boolean | null
   status: EmployeeStatus | null
 }
 
