@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  X, Send, Bot, User, Sparkles, FileText,
+  X, Send, Bot, User, Sparkles, FileText, Download,
   ChevronDown, Minimize2, Maximize2, Expand, Shrink,
 } from 'lucide-react'
 
@@ -46,6 +46,111 @@ const initialMessages: Message[] = [
     timestamp: new Date(),
   },
 ]
+
+type MessageSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'file'; label: string; url: string }
+
+const INLINE_URL_RE = /(https?:\/\/[^\s)]+)/g
+
+/** href 로 안전하게 쓰도록 URL 안의 공백만 인코딩한다. (IBK 링크는 fileName 파라미터에 한글·공백이 그대로 들어있음) */
+function toSafeHref(url: string): string {
+  return url.trim().replace(/ /g, '%20')
+}
+
+/**
+ * 봇 답변 본문을 파싱한다.
+ * "http 로 시작하는 줄"은 바로 위의 파일명 줄을 라벨로 묶어 다운로드 카드로 만들고,
+ * 나머지는 텍스트로 둔다. (양서식 답변: `N. 파일명`/`- 파일명` + 다음 줄 링크 형태)
+ * URL 자체에 공백이 포함될 수 있으므로 \S+ 가 아니라 "줄 전체가 URL"로 판단한다.
+ */
+function parseMessageSegments(content: string): MessageSegment[] {
+  const lines = content.split('\n')
+  const segments: MessageSegment[] = []
+  let textBuffer: string[] = []
+
+  const flushText = () => {
+    const text = textBuffer.join('\n').trim()
+    if (text) segments.push({ kind: 'text', text })
+    textBuffer = []
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!/^https?:\/\//.test(trimmed)) {
+      textBuffer.push(line)
+      continue
+    }
+
+    // 직전 비어있지 않은 줄을 파일 라벨로 끌어온다.
+    let label = ''
+    for (let j = textBuffer.length - 1; j >= 0; j -= 1) {
+      if (textBuffer[j].trim()) {
+        label = textBuffer[j].trim()
+        textBuffer.splice(j, 1)
+        break
+      }
+    }
+    flushText()
+    const cleanLabel = label.replace(/^(\d+\.\s*|[-•]\s*)/, '').trim() || '첨부 파일'
+    segments.push({ kind: 'file', label: cleanLabel, url: trimmed })
+  }
+
+  flushText()
+  return segments
+}
+
+/** 텍스트 안의 인라인 URL을 클릭 가능한 링크로 변환한다. */
+function renderTextWithLinks(text: string) {
+  return text.split(INLINE_URL_RE).map((part, index) =>
+    part.startsWith('http') ? (
+      <a
+        key={index}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary font-medium underline underline-offset-2 hover:text-accent break-all"
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  )
+}
+
+function MessageContent({ content }: { content: string }) {
+  const segments = parseMessageSegments(content)
+
+  return (
+    <div className="space-y-2">
+      {segments.map((segment, index) =>
+        segment.kind === 'file' ? (
+          <a
+            key={index}
+            href={toSafeHref(segment.url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={segment.label}
+            className="group flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/8 p-3 transition-all duration-300 hover:border-primary/40 hover:bg-primary/15 hover:shadow-md"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <FileText className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1 break-words text-xs font-medium leading-snug text-foreground">
+              {segment.label}
+            </span>
+            <Download className="h-4 w-4 shrink-0 text-primary/50 transition-colors group-hover:text-primary" />
+          </a>
+        ) : (
+          <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
+            {renderTextWithLinks(segment.text)}
+          </p>
+        ),
+      )}
+    </div>
+  )
+}
 
 export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
@@ -283,7 +388,11 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                         ? 'bg-gradient-to-r from-primary to-accent text-white rounded-tr-sm shadow-md'
                         : 'bg-white/70 text-foreground rounded-tl-sm border border-white/50'
                     }`}>
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      {message.role === 'bot' ? (
+                        <MessageContent content={message.content} />
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      )}
                     </div>
 
                     {/* 파일 첨부 (우측 UI) */}
