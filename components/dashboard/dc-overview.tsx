@@ -1,40 +1,19 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, Users, Wallet, AlertTriangle, ArrowUpRight, ArrowDownRight, Sparkles, CalendarClock, ShieldAlert, FileX, ShoppingCart, RefreshCw, ChevronRight } from 'lucide-react'
+import { TrendingUp, Users, Wallet, AlertTriangle, Sparkles, CalendarClock, ShieldAlert, FileX, ShoppingCart, RefreshCw, ChevronRight, Loader2 } from 'lucide-react'
+import { getPensionDashboard, DcDashboard } from '@/lib/api'
 
-const statsCards = [
-  {
-    title: 'DC형 총 적립금',
-    value: '124.5',
-    unit: '억원',
-    change: '+2.4%',
-    trend: 'up',
-    icon: Wallet,
-    gradient: 'from-primary/15 to-primary/5',
-    iconGradient: 'from-primary to-blue-500',
-  },
-  {
-    title: '총 가입자 수',
-    value: '1,234',
-    unit: '명',
-    change: '+12',
-    trend: 'up',
-    icon: Users,
-    gradient: 'from-sky-500/15 to-sky-500/5',
-    iconGradient: 'from-sky-500 to-blue-400',
-  },
-  {
-    title: '디폴트옵션 미지정자',
-    value: '45',
-    unit: '명',
-    change: '-5',
-    trend: 'down',
-    icon: AlertTriangle,
-    gradient: 'from-amber-500/15 to-amber-500/5',
-    iconGradient: 'from-amber-500 to-orange-400',
-  },
-]
+function toEok(amount: number): string {
+  return (amount / 100000000).toFixed(2)
+}
+
+function calcDday(dueDateStr: string | null): string {
+  if (!dueDateStr) return '-'
+  const diff = Math.ceil((new Date(dueDateStr).getTime() - Date.now()) / 86400000)
+  return diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`
+}
 
 const contributionData = [
   { month: '1월', planned: 120, actual: 115 },
@@ -93,13 +72,28 @@ const unprocessedItems = [
 ]
 
 export function DCOverview() {
+  const [data, setData] = useState<DcDashboard | null>(null)
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    getPensionDashboard(ctrl.signal)
+      .then(setData)
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      })
+    return () => ctrl.abort()
+  }, [])
+
+  const dueLabel = data?.contribution_due_date
+    ? data.contribution_due_date.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$2/$3')
+    : '-'
+
   return (
     <div className="space-y-6">
       {/* Welcome Hero */}
       <div className="glass rounded-2xl p-8 relative overflow-hidden animate-scale-in">
         <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-accent/20 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-accent/20">
@@ -116,38 +110,53 @@ export function DCOverview() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsCards.map((stat, index) => {
-          const Icon = stat.icon
-          const TrendIcon = stat.trend === 'up' ? ArrowUpRight : ArrowDownRight
-          return (
-            <Card 
-              key={stat.title} 
-              className={`glass border-0 card-interactive bg-gradient-to-br ${stat.gradient} animate-slide-up`}
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.iconGradient} flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className={`flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium ${
-                    stat.trend === 'up' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'
-                  }`}>
-                    <TrendIcon className="w-3 h-3" />
-                    <span>{stat.change}</span>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm text-muted-foreground">{stat.title}</p>
-                  <p className="text-3xl font-bold text-foreground mt-1">
-                    {stat.value}
-                    <span className="text-lg font-normal text-muted-foreground ml-1">{stat.unit}</span>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+        {/* DC형 총 적립금 */}
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up" style={{ animationDelay: '0ms' }}>
+          <CardContent className="p-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
+              <Wallet className="w-6 h-6 text-white" />
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">DC형 총 적립금</p>
+              <p className="text-3xl font-bold text-foreground mt-1">
+                {data ? toEok(data.total_balance) : '-'}
+                <span className="text-lg font-normal text-muted-foreground ml-1">억원</span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 총 가입자 수 */}
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <CardContent className="p-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">총 가입자 수</p>
+              <p className="text-3xl font-bold text-foreground mt-1">
+                {data ? data.total_employee.toLocaleString() : '-'}
+                <span className="text-lg font-normal text-muted-foreground ml-1">명</span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 디폴트옵션 미지정자 */}
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-amber-500/15 to-amber-500/5 animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <CardContent className="p-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">디폴트옵션 미지정자</p>
+              <p className="text-3xl font-bold text-foreground mt-1">
+                {data ? data.default_option_not_selected.toLocaleString() : '-'}
+                <span className="text-lg font-normal text-muted-foreground ml-1">명</span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 이번 달 납입 부담금 */}
         <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up" style={{ animationDelay: '300ms' }}>
@@ -156,18 +165,22 @@ export function DCOverview() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
                 <CalendarClock className="w-6 h-6 text-white" />
               </div>
-              <div className="flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium bg-red-100 text-red-500">
-                <CalendarClock className="w-3 h-3" />
-                <span>D-4</span>
-              </div>
+              {data?.contribution_due_date && (
+                <div className="flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium bg-red-100 text-red-500">
+                  <CalendarClock className="w-3 h-3" />
+                  <span>{calcDday(data.contribution_due_date)}</span>
+                </div>
+              )}
             </div>
             <div className="mt-4">
               <p className="text-sm text-muted-foreground">이번 달 납입 부담금</p>
               <p className="text-3xl font-bold text-foreground mt-1">
-                1.24
+                {data ? toEok(data.this_month_contribution) : '-'}
                 <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">납입기한 <span className="font-semibold text-foreground">6/5</span></p>
+              <p className="text-xs text-muted-foreground mt-1">
+                납입기한 <span className="font-semibold text-foreground">{dueLabel}</span>
+              </p>
             </div>
           </CardContent>
         </Card>
