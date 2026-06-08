@@ -293,7 +293,7 @@ function AddModalContent({
 }) {
   const [form, setForm] = useState({
     title: '',
-    scheduleDate: defaultDate || '',
+    dueDate: defaultDate || '',
     content: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -317,7 +317,7 @@ function AddModalContent({
   const validate = () => {
     const e: Record<string, string> = {}
     if (!form.title.trim()) e.title = '일정 타이틀을 입력해주세요.'
-    if (!form.scheduleDate) e.scheduleDate = '일정 날짜를 선택해주세요.'
+    if (!form.  dueDate) e.dueDate = '일정 날짜를 선택해주세요.'
     if (!form.content.trim()) e.content = '일정 내용을 입력해주세요.'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -340,7 +340,7 @@ function AddModalContent({
     const newSchedule: Schedule = {
       id: `DL-${Date.now()}`,
       title: form.title,
-      scheduleDate: form.scheduleDate,
+      dueDate: form.dueDate,
       content: form.content,
       type: 'DC',
       targetType: hasSubscriber ? '가입자' : '기업' as TargetType,
@@ -416,11 +416,11 @@ function AddModalContent({
             </label>
             <input
               type="date"
-              className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.scheduleDate ? 'border-red-400' : 'border-slate-200'}`}
-              value={form.scheduleDate}
-              onChange={e => f('scheduleDate', e.target.value)}
+              className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.dueDate ? 'border-red-400' : 'border-slate-200'}`}
+              value={form.dueDate}
+              onChange={e => f('dueDate', e.target.value)}
             />
-            {errors.scheduleDate && <p className="text-xs text-red-500 mt-1.5">{errors.scheduleDate}</p>}
+            {errors.dueDate && <p className="text-xs text-red-500 mt-1.5">{errors.dueDate}</p>}
           </div>
         </div>
 
