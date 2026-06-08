@@ -3,8 +3,8 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { DBOverview } from '@/components/dashboard/db-overview'
-import { MemberManagement } from '@/components/dashboard/member-management'
-import { DeadlineAlerts } from '@/components/dashboard/deadline-alerts'
+import { MemberManagement } from '@/components/dashboard/dc-member-management'
+import { DeadlineAlerts } from '@/components/dashboard/dc-deadline-alerts'
 import { DocumentForms } from '@/components/dashboard/document-forms'
 import type { TabType } from '@/lib/types'
 
