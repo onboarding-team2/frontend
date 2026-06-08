@@ -23,18 +23,7 @@ const contributionData = [
   { month: '5월', planned: 120, actual: 0 },
 ]
 
-const unprocessedItems = [
-  {
-    title: '디폴트옵션 미선정',
-    count: 12,
-    icon: AlertTriangle,
-    iconGradient: 'from-amber-500 to-orange-400',
-    rows: [
-      { name: '김지훈', dateLabel: '가입일 2025.03.12', badge: '54일 초과', badgeType: 'danger' },
-      { name: '이수연', dateLabel: '가입일 2025.04.01', badge: '34일 초과', badgeType: 'danger' },
-    ],
-    extra: '박민준 외 10명',
-  },
+const staticUnprocessedItems = [
   {
     title: 'IRP 개설 미완료',
     count: 3,
@@ -73,6 +62,23 @@ const unprocessedItems = [
 
 export function DCOverview() {
   const [data, setData] = useState<DcDashboard | null>(null)
+
+  const unprocessedItems = [
+    {
+      title: '디폴트옵션 미선정',
+      count: data?.default_option_not_selected ?? 0,
+      icon: AlertTriangle,
+      iconGradient: 'from-amber-500 to-orange-400',
+      rows: (data?.default_option_members ?? []).slice(0, 2).map((m) => ({
+        name: m.name,
+        dateLabel: `가입일 ${m.join_date.replace(/-/g, '.')}`,
+        badge: `${m.days_elapsed}일 경과`,
+        badgeType: 'danger',
+      })),
+      extra: data?.default_option_summary ?? null,
+    },
+    ...staticUnprocessedItems,
+  ]
 
   useEffect(() => {
     const ctrl = new AbortController()
