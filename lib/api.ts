@@ -297,3 +297,14 @@ export async function getDcMemberDetail(id: number, signal?: AbortSignal): Promi
   if (!res.ok) throw new Error(await readError(res, '가입자 상세 조회 실패'))
   return res.json()
 }
+
+export async function getPensionMemberDetail(id: number, signal?: AbortSignal): Promise<EmployeeDetail> {
+  const planType = getPlanType()?.toLowerCase() ?? 'dc'
+  const res = await fetch(`${API_BASE}/pension/${planType}/members/${id}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '가입자 상세 조회 실패'))
+  return res.json()
+}
