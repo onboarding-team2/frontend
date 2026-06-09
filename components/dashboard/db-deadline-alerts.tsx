@@ -30,10 +30,6 @@ type FilterCategory = 'all' | 'imminent' | 'overdue'
 // ─── API 응답 → DeadlineSchedule 변환 ─────────────────────────────────────
 
 function convertDetailToSchedule(detail: ScheduleDbDetail): DeadlineSchedule {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const deadline = new Date(detail.due_date)
-  const isOverdue = deadline < today && detail.status !== '완료'
   const hasEmployees = detail.target_employees && detail.target_employees.length > 0
 
   return {
@@ -44,7 +40,7 @@ function convertDetailToSchedule(detail: ScheduleDbDetail): DeadlineSchedule {
     type: 'DB',
     targetType: hasEmployees ? '가입자' : ('기업' as TargetType),
     priority: 'medium',
-    status: detail.status === '완료' ? '완료' : isOverdue ? '지연' : '예정',
+    status: detail.status === 'DONE' ? '완료' : detail.status === 'OVERDUE' ? '지연' : '예정',
     createdAt: detail.created_date || '',
     relatedSubscribers: hasEmployees
       ? detail.target_employees.map(e => ({
@@ -789,22 +785,17 @@ export function DeadlineAlerts() {
     const controller = new AbortController()
     getSchedulesDb({}, controller.signal)
       .then(res => {
-        const items = res.schedules.map(item => {
-          const today = new Date(); today.setHours(0, 0, 0, 0)
-          const deadline = new Date(item.due_date)
-          const isOverdue = deadline < today && item.status !== '완료'
-          return {
-            id: String(item.id),
-            title: item.title,
-            deadline: item.due_date,
-            content: '',
-            type: 'DB' as const,
-            targetType: '기업' as TargetType,
-            priority: 'medium' as const,
-            status: item.status === '완료' ? ('완료' as const) : isOverdue ? ('지연' as const) : ('예정' as const),
-            createdAt: '',
-          }
-        })
+        const items = res.schedules.map(item => ({
+          id: String(item.id),
+          title: item.title,
+          deadline: item.due_date,
+          content: '',
+          type: 'DB' as const,
+          targetType: '기업' as TargetType,
+          priority: 'medium' as const,
+          status: item.status === 'DONE' ? ('완료' as const) : item.status === 'OVERDUE' ? ('지연' as const) : ('예정' as const),
+          createdAt: '',
+        }))
         setSchedules(items)
       })
       .catch(() => {})
