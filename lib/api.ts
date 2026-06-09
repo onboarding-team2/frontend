@@ -170,8 +170,8 @@ export async function getDcMembers(signal?: AbortSignal): Promise<Employee[]> {
   return (await fetchMemberPage('dc', { size: 100000 }, signal)).members
 }
 
-export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
-  return pensionFetch('/deadlines', signal) as Promise<ExpectedRetiree[]>
+export async function getPensionSchedules(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
+  return pensionFetch('/schedules', signal) as Promise<ExpectedRetiree[]>
 }
 
 export async function getPensionDocuments(signal?: AbortSignal): Promise<unknown> {
