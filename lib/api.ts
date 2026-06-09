@@ -24,6 +24,7 @@ export type DcDashboard = {
   default_option_not_selected: number
   default_option_members: DefaultOptionMember[]
   default_option_summary: string | null
+  irp_not_opened: number
   this_month_contribution: number
   contribution_due_date: string | null
 }
@@ -61,6 +62,7 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashb
     default_option_summary: (r.default_option_summary ?? r.defaultOptionSummary ?? null) as string | null,
     this_month_contribution: (r.this_month_contribution ?? r.thisMonthContribution ?? 0) as number,
     contribution_due_date: (r.contribution_due_date ?? r.contributionDueDate ?? null) as string | null,
+    irp_not_opened: (r.irp_account_not_opened ?? r.irpAccountNotOpened ?? 0) as number,
   }
 }
 

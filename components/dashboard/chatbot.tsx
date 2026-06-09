@@ -13,14 +13,22 @@ interface Message {
   role: 'user' | 'bot'
   content: string
   timestamp: Date
+  intent?: ChatIntent
   relatedQuestions?: string[]
   attachments?: { name: string; url: string }[]
 }
+
+type ChatIntent = 'faq' | 'regulation' | 'site_guide' | 'business_query' | 'forms' | 'general' | 'guardrail' | 'unknown'
 
 interface ChatSource {
   type?: string
   id?: string
   title?: string
+}
+
+interface ChatHistoryPayload {
+  role: 'user' | 'assistant'
+  content: string
 }
 
 interface ChatBotProps {
@@ -52,6 +60,53 @@ type MessageSegment =
   | { kind: 'file'; label: string; url: string }
 
 const INLINE_URL_RE = /(https?:\/\/[^\s)]+)/g
+
+const intentLabels: Record<ChatIntent, string> = {
+  faq: 'FAQ',
+  regulation: '규정',
+  site_guide: '사이트 안내',
+  business_query: '업무 조회',
+  forms: '양서식',
+  general: '일반',
+  guardrail: '가드레일',
+  unknown: '분류 미확인',
+}
+
+const intentBadgeClass: Record<ChatIntent, string> = {
+  faq: 'border-sky-200 bg-sky-50 text-sky-700',
+  regulation: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  site_guide: 'border-violet-200 bg-violet-50 text-violet-700',
+  business_query: 'border-amber-200 bg-amber-50 text-amber-700',
+  forms: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+  general: 'border-slate-200 bg-slate-50 text-slate-600',
+  guardrail: 'border-rose-200 bg-rose-50 text-rose-700',
+  unknown: 'border-slate-200 bg-slate-50 text-slate-500',
+}
+
+function normalizeIntent(value: unknown): ChatIntent {
+  if (
+    value === 'faq' ||
+    value === 'regulation' ||
+    value === 'site_guide' ||
+    value === 'business_query' ||
+    value === 'forms' ||
+    value === 'general' ||
+    value === 'guardrail'
+  ) {
+    return value
+  }
+  return 'unknown'
+}
+
+function buildChatHistory(messages: Message[]): ChatHistoryPayload[] {
+  return messages
+    .filter((message) => message.id !== '1')
+    .map((message) => ({
+      role: message.role === 'bot' ? 'assistant' : 'user',
+      content: message.content.trim(),
+    }))
+    .filter((message) => message.content.length > 0)
+}
 
 /** href 로 안전하게 쓰도록 URL 안의 공백만 인코딩한다. (IBK 링크는 fileName 파라미터에 한글·공백이 그대로 들어있음) */
 function toSafeHref(url: string): string {
@@ -184,6 +239,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     sources?: ChatSource[],
     currentQuestion?: string,
     attachments?: { name: string; url: string }[],
+    intent?: ChatIntent,
   ) => {
     setMessages((prev) => {
       const relatedQuestions = sources
@@ -197,6 +253,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             ? {
                 ...m,
                 content,
+                intent: intent ?? m.intent,
                 relatedQuestions: relatedQuestions ?? m.relatedQuestions,
                 attachments: attachments ?? m.attachments,
               }
@@ -210,6 +267,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           role: 'bot',
           content,
           timestamp: new Date(),
+          intent,
           relatedQuestions,
           attachments,
         },
@@ -217,17 +275,18 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     })
   }
 
-  const sendMessageToAi = async (userMessage: string) => {
+  const sendMessageToAi = async (userMessage: string, history: ChatHistoryPayload[]) => {
     setIsTyping(true)
     const botMessageId = `bot-${Date.now()}`
     let answer = ''
     let pendingLine = ''
+    let intent: ChatIntent | undefined
 
     try {
       const response = await fetch(CHAT_STREAM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, company_id: 'poc' }),
+        body: JSON.stringify({ message: userMessage, company_id: 'poc', history }),
       })
 
       if (!response.ok) throw new Error(`AI API returned ${response.status}`)
@@ -249,13 +308,17 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           if (!line) continue
 
           const payload = JSON.parse(line)
+          if (payload.meta) {
+            intent = normalizeIntent(payload.meta.intent)
+            if (answer.trim()) appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
+          }
           if (payload.t) {
             answer += payload.t
-            appendBotMessage(botMessageId, answer)
+            appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
             setIsTyping(false)
           }
           if (payload.sources) {
-            appendBotMessage(botMessageId, answer, payload.sources, userMessage)
+            appendBotMessage(botMessageId, answer, payload.sources, userMessage, undefined, intent)
           }
           if (payload.done) break
         }
@@ -263,12 +326,13 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
       if (pendingLine.trim()) {
         const payload = JSON.parse(pendingLine.trim().replace(/^data:\s*/, ''))
+        if (payload.meta) intent = normalizeIntent(payload.meta.intent)
         if (payload.t) answer += payload.t
-        appendBotMessage(botMessageId, answer, payload.sources, userMessage)
+        appendBotMessage(botMessageId, answer, payload.sources, userMessage, undefined, intent)
       }
 
       if (!answer.trim()) {
-        appendBotMessage(botMessageId, '응답을 받지 못했습니다. 잠시 후 다시 시도해주세요.')
+        appendBotMessage(botMessageId, '응답을 받지 못했습니다. 잠시 후 다시 시도해주세요.', undefined, undefined, undefined, intent)
       }
     } catch (error) {
       console.error(error)
@@ -284,16 +348,18 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const handleSend = () => {
     const trimmed = inputValue.trim()
     if (!trimmed) return
+    const history = buildChatHistory(messages)
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: trimmed, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
     setInputValue('')
-    sendMessageToAi(trimmed)
+    sendMessageToAi(trimmed, history)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
+    const history = buildChatHistory(messages)
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: suggestion, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
-    sendMessageToAi(suggestion)
+    sendMessageToAi(suggestion, history)
   }
 
   if (!isOpen) return null
@@ -389,7 +455,16 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                         : 'bg-white/70 text-foreground rounded-tl-sm border border-white/50'
                     }`}>
                       {message.role === 'bot' ? (
-                        <MessageContent content={message.content} />
+                        <>
+                          {message.intent && (
+                            <div className="mb-2 flex justify-start">
+                              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${intentBadgeClass[message.intent]}`}>
+                                의도: {intentLabels[message.intent]}
+                              </span>
+                            </div>
+                          )}
+                          <MessageContent content={message.content} />
+                        </>
                       ) : (
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                       )}
