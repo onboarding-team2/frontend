@@ -64,6 +64,23 @@ export function MemberManagement() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deletingMember, setDeletingMember] = useState<Member | null>(null)
 
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [newMember, setNewMember] = useState<Omit<Member, 'id'>>({
+    name: '',
+    joinDate: '',
+    irpAccount: '미개설',
+    defaultOption: '미설정',
+    balance: '',
+  })
+  const [regEmployeeType, setRegEmployeeType] = useState<'EMPLOYEE' | 'EXECUTIVE'>('EMPLOYEE')
+  const [regRrn, setRegRrn] = useState('')
+
+  const formatRrn = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 13)
+    if (digits.length <= 6) return digits
+    return `${digits.slice(0, 6)}-${digits.slice(6)}`
+  }
+
   const filteredMembers = members.filter((member) => {
     const matchesSearch = member.name.includes(searchTerm)
     const matchesIrp = filterIrp === 'all' || member.irpAccount === filterIrp
@@ -102,6 +119,13 @@ export function MemberManagement() {
     }
   }
 
+  const handleRegisterSave = () => {
+    if (!newMember.name || !newMember.joinDate) return
+    setMembers(prev => [...prev, { ...newMember, id: String(Date.now()) }])
+    setIsRegisterOpen(false)
+    setNewMember({ name: '', joinDate: '', irpAccount: '미개설', defaultOption: '미설정', balance: '' })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between animate-slide-up">
@@ -114,7 +138,7 @@ export function MemberManagement() {
             <p className="text-muted-foreground">퇴직연금 가입자 정보를 관리합니다</p>
           </div>
         </div>
-        <Button className="btn-hover gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
+        <Button onClick={() => setIsRegisterOpen(true)} className="btn-hover gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
           <Plus className="w-4 h-4" />
           가입자 등록
         </Button>
@@ -122,8 +146,9 @@ export function MemberManagement() {
 
       {/* Filters */}
       <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '100ms' }}>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
+        <CardContent className="p-4 space-y-4">
+          {/* 검색 + 필터/내보내기 */}
+          <div className="flex gap-3">
             <div className="flex-1 relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
               <Input
@@ -134,56 +159,64 @@ export function MemberManagement() {
                 className="pl-11 h-11 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
               />
             </div>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1 bg-white/50 rounded-xl p-1 border border-white/50">
-                {(['all', '개설완료', '미개설'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setFilterIrp(type)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                      filterIrp === type
-                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-md'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-white/50'
-                    }`}
-                  >
-                    {type === 'all' ? '전체' : type}
-                  </button>
-                ))}
-              </div>
-              <Button variant="outline" className="gap-2 border-white/50 bg-white/30 hover:bg-white/60 transition-all duration-300 hover:scale-105 active:scale-95">
-                <Filter className="w-4 h-4" />
-                필터
-              </Button>
-              <Button variant="outline" className="gap-2 border-white/50 bg-white/30 hover:bg-white/60 transition-all duration-300 hover:scale-105 active:scale-95">
-                <Download className="w-4 h-4" />
-                내보내기
-              </Button>
+            <Button variant="outline" className="gap-2 border-white/50 bg-white/30 hover:bg-white/60 transition-all">
+              <Filter className="w-4 h-4" />
+              필터
+            </Button>
+            <Button variant="outline" className="gap-2 border-white/50 bg-white/30 hover:bg-white/60 transition-all">
+              <Download className="w-4 h-4" />
+              내보내기
+            </Button>
+          </div>
+
+          {/* IRP계좌 필터 행 */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground w-20 shrink-0">IRP 계좌</span>
+            <div className="flex items-center gap-2">
+              {([
+                { value: 'all', label: '전체', count: members.length },
+                { value: '개설완료', label: '개설완료', count: members.filter(m => m.irpAccount === '개설완료').length },
+                { value: '미개설', label: '미개설', count: members.filter(m => m.irpAccount === '미개설').length },
+              ] as const).map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setFilterIrp(item.value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                    filterIrp === item.value
+                      ? 'bg-primary text-white font-semibold shadow-sm'
+                      : 'bg-white/50 text-muted-foreground hover:bg-white/80'
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <span className={`text-xs font-bold ${filterIrp === item.value ? 'text-white/90' : 'text-foreground'}`}>{item.count}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Quick Filters for Default Option */}
-          <div className="flex gap-2 mt-4">
-            {[
-              { id: 'all', label: '전체 보기', color: 'primary' },
-              { id: 'unset', label: '디폴트옵션 미설정', color: 'destructive' },
-              { id: 'set', label: '설정 완료', color: 'emerald' },
-            ].map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => setFilterDefault(filter.id as 'all' | 'set' | 'unset')}
-                className={`px-4 py-2 rounded-xl text-sm border transition-all duration-300 hover:scale-105 active:scale-95 ${
-                  filterDefault === filter.id
-                    ? filter.color === 'primary'
-                      ? 'border-primary bg-primary/15 text-primary shadow-sm'
-                      : filter.color === 'destructive'
-                      ? 'border-destructive bg-destructive/15 text-destructive shadow-sm'
-                      : 'border-emerald-500 bg-emerald-100 text-emerald-600 shadow-sm'
-                    : 'border-white/50 bg-white/30 text-muted-foreground hover:border-primary/30 hover:bg-white/50'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          {/* 디폴트옵션 필터 행 */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground w-20 shrink-0">디폴트옵션</span>
+            <div className="flex items-center gap-2">
+              {([
+                { value: 'all', label: '전체', count: members.length },
+                { value: 'set', label: '설정 완료', count: members.filter(m => m.defaultOption === '설정완료').length },
+                { value: 'unset', label: '미설정', count: members.filter(m => m.defaultOption === '미설정').length },
+              ] as const).map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setFilterDefault(item.value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                    filterDefault === item.value
+                      ? 'bg-primary text-white font-semibold shadow-sm'
+                      : 'bg-white/50 text-muted-foreground hover:bg-white/80'
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <span className={`text-xs font-bold ${filterDefault === item.value ? 'text-white/90' : 'text-foreground'}`}>{item.count}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -350,7 +383,6 @@ export function MemberManagement() {
                     <SelectContent>
                       <SelectItem value="설정완료">설정완료</SelectItem>
                       <SelectItem value="미설정">미설정</SelectItem>
-                      <SelectItem value="-">-</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -371,6 +403,118 @@ export function MemberManagement() {
               취소
             </Button>
             <Button onClick={handleEditSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+              저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Register Member Dialog */}
+      <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
+        <DialogContent className="sm:max-w-[500px] glass-strong border-white/30">
+          <DialogHeader>
+            <DialogTitle>가입자 등록</DialogTitle>
+            <DialogDescription>
+              새 가입자 정보를 입력합니다. 등록하려면 저장 버튼을 클릭하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reg-name">이름</Label>
+                <Input
+                  id="reg-name"
+                  value={newMember.name}
+                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-joinDate">가입일</Label>
+                <Input
+                  id="reg-joinDate"
+                  type="date"
+                  value={newMember.joinDate}
+                  onChange={(e) => setNewMember({ ...newMember, joinDate: e.target.value })}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reg-rrn">주민번호</Label>
+                <Input
+                  id="reg-rrn"
+                  value={regRrn}
+                  onChange={(e) => setRegRrn(formatRrn(e.target.value))}
+                  placeholder="000000-0000000"
+                  maxLength={14}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-employeeType">임직원</Label>
+                <Select
+                  value={regEmployeeType}
+                  onValueChange={(value: 'EMPLOYEE' | 'EXECUTIVE') => setRegEmployeeType(value)}
+                >
+                  <SelectTrigger className="bg-white/50 border-white/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EMPLOYEE">EMPLOYEE</SelectItem>
+                    <SelectItem value="EXECUTIVE">EXECUTIVE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reg-irpAccount">IRP계좌</Label>
+                <Select
+                  value={newMember.irpAccount}
+                  onValueChange={(value: '개설완료' | '미개설') => setNewMember({ ...newMember, irpAccount: value })}
+                >
+                  <SelectTrigger className="bg-white/50 border-white/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="개설완료">개설완료</SelectItem>
+                    <SelectItem value="미개설">미개설</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-defaultOption">디폴트옵션</Label>
+                <Select
+                  value={newMember.defaultOption}
+                  onValueChange={(value) => setNewMember({ ...newMember, defaultOption: value })}
+                >
+                  <SelectTrigger className="bg-white/50 border-white/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="설정완료">설정완료</SelectItem>
+                    <SelectItem value="미설정">미설정</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-balance">적립금</Label>
+              <Input
+                id="reg-balance"
+                value={newMember.balance}
+                onChange={(e) => setNewMember({ ...newMember, balance: e.target.value })}
+                className="bg-white/50 border-white/50"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRegisterOpen(false)} className="border-white/50 bg-white/30">
+              취소
+            </Button>
+            <Button onClick={handleRegisterSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
               저장
             </Button>
           </DialogFooter>
