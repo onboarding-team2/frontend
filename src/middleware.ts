@@ -25,14 +25,5 @@ export function middleware(request: NextRequest) {
 
 // 미들웨어 간섭 예외 설정
 export const config = {
-  matcher: [
-    /*
-     * - _next/static (정적 스타일, 스크립트 파일)
-     * - _next/image (Next.js 이미지 최적화 파일)
-     * - favicon.ico (브라우저 탭 아이콘)
-     * - 공공 API 호출이나 외부 백엔드 주소(http://localhost:8080)는 영향을 받지 않지만,
-     * 혹시 모를 내부 api 경로(/api/:path*)도 예외 처리
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api).*)',
-  ],
+  matcher: ['/pension/:path*'],
 }
