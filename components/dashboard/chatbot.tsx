@@ -26,6 +26,11 @@ interface ChatSource {
   title?: string
 }
 
+interface ChatHistoryPayload {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 interface ChatBotProps {
   isOpen: boolean
   onClose: () => void
@@ -91,6 +96,16 @@ function normalizeIntent(value: unknown): ChatIntent {
     return value
   }
   return 'unknown'
+}
+
+function buildChatHistory(messages: Message[]): ChatHistoryPayload[] {
+  return messages
+    .filter((message) => message.id !== '1')
+    .map((message) => ({
+      role: message.role === 'bot' ? 'assistant' : 'user',
+      content: message.content.trim(),
+    }))
+    .filter((message) => message.content.length > 0)
 }
 
 /** href 로 안전하게 쓰도록 URL 안의 공백만 인코딩한다. (IBK 링크는 fileName 파라미터에 한글·공백이 그대로 들어있음) */
@@ -260,7 +275,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     })
   }
 
-  const sendMessageToAi = async (userMessage: string) => {
+  const sendMessageToAi = async (userMessage: string, history: ChatHistoryPayload[]) => {
     setIsTyping(true)
     const botMessageId = `bot-${Date.now()}`
     let answer = ''
@@ -271,7 +286,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       const response = await fetch(CHAT_STREAM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, company_id: 'poc' }),
+        body: JSON.stringify({ message: userMessage, company_id: 'poc', history }),
       })
 
       if (!response.ok) throw new Error(`AI API returned ${response.status}`)
@@ -333,16 +348,18 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const handleSend = () => {
     const trimmed = inputValue.trim()
     if (!trimmed) return
+    const history = buildChatHistory(messages)
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: trimmed, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
     setInputValue('')
-    sendMessageToAi(trimmed)
+    sendMessageToAi(trimmed, history)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
+    const history = buildChatHistory(messages)
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: suggestion, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
-    sendMessageToAi(suggestion)
+    sendMessageToAi(suggestion, history)
   }
 
   if (!isOpen) return null
