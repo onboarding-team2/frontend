@@ -10,38 +10,54 @@ import { Button } from '@/components/ui/button'
 import {
   DeadlineSchedule,
   TargetType,
-  mockDeadlines,
 } from '@/lib/deadline-data'
 import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
+import {
+  Employee,
+  ScheduleDbDetail,
+  getPensionMembers,
+  getSchedulesDb,
+  getScheduleDbDetail,
+  createScheduleDb,
+  deleteScheduleDb,
+  completeScheduleDb,
+  getPensionMemberDetail,
+} from '@/lib/api'
 
 type ViewMode = 'list' | 'calendar'
 type FilterCategory = 'all' | 'imminent' | 'overdue'
 
-// 가입자관리 명부 데이터 (member-management.tsx와 공유)
-interface MemberData {
-  id: string
-  employeeId: string
-  name: string
-  department: string
-  company: string
-  joinDate: string
-  type: 'DC' | 'DB'
-  defaultOption: string
-  balance: string
-}
+// ─── API 응답 → DeadlineSchedule 변환 ─────────────────────────────────────
 
-const memberList: MemberData[] = [
-  { id: '1', employeeId: 'E001', name: '홍길동', department: '영업팀', company: '삼성전자(주)', joinDate: '2020-03-15', type: 'DC', defaultOption: '설정완료', balance: '45,230,000' },
-  { id: '2', employeeId: 'E002', name: '김영희', department: '개발팀', company: '삼성전자(주)', joinDate: '2019-07-20', type: 'DC', defaultOption: '미설정', balance: '67,890,000' },
-  { id: '3', employeeId: 'E003', name: '이철수', department: '인사팀', company: 'LG화학(주)', joinDate: '2018-01-10', type: 'DB', defaultOption: '-', balance: '89,120,000' },
-  { id: '4', employeeId: 'E004', name: '박지민', department: '마케팅팀', company: 'SK하이닉스(주)', joinDate: '2021-05-05', type: 'DC', defaultOption: '설정완료', balance: '23,450,000' },
-  { id: '5', employeeId: 'E005', name: '최수진', department: '재무팀', company: '현대자동차(주)', joinDate: '2017-09-12', type: 'DB', defaultOption: '-', balance: '112,340,000' },
-  { id: '6', employeeId: 'E006', name: '정민수', department: '영업팀', company: '두산중공업(주)', joinDate: '2022-02-28', type: 'DC', defaultOption: '미설정', balance: '15,670,000' },
-  { id: '7', employeeId: 'E007', name: '강하나', department: '개발팀', company: '포스코(주)', joinDate: '2020-11-15', type: 'DC', defaultOption: '설정완료', balance: '38,900,000' },
-  { id: '8', employeeId: 'E008', name: '윤서연', department: '인사팀', company: '현대모비스(주)', joinDate: '2019-04-22', type: 'DB', defaultOption: '-', balance: '72,100,000' },
-  { id: '9', employeeId: 'E009', name: '김태양', department: '생산팀', company: '두산중공업(주)', joinDate: '2020-03-01', type: 'DB', defaultOption: '-', balance: '45,000,000' },
-  { id: '10', employeeId: 'E010', name: '김민준', department: '연구팀', company: '삼성전자(주)', joinDate: '2021-06-15', type: 'DC', defaultOption: '설정완료', balance: '28,000,000' },
-]
+function convertDetailToSchedule(detail: ScheduleDbDetail): DeadlineSchedule {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadline = new Date(detail.due_date)
+  const isOverdue = deadline < today && detail.status !== '완료'
+  const hasEmployees = detail.target_employees && detail.target_employees.length > 0
+
+  return {
+    id: String(detail.id),
+    title: detail.title,
+    deadline: detail.due_date,
+    content: detail.description || '',
+    type: 'DB',
+    targetType: hasEmployees ? '가입자' : ('기업' as TargetType),
+    priority: 'medium',
+    status: detail.status === '완료' ? '완료' : isOverdue ? '지연' : '예정',
+    createdAt: detail.created_date || '',
+    relatedSubscribers: hasEmployees
+      ? detail.target_employees.map(e => ({
+          id: String(e.employee_id),
+          name: e.name,
+          employeeId: String(e.employee_id),
+          company: e.company_name || '',
+          joinDate: '',
+          balance: 0,
+        }))
+      : undefined,
+  }
+}
 
 /* ─────────────────────────────────────────────
    Toast 컴포넌트
@@ -55,8 +71,8 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
   return (
     <div className="fixed bottom-6 right-6 z-[10000] animate-slide-up">
       <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl ${
-        type === 'success' 
-          ? 'bg-gradient-to-r from-emerald-500/90 to-green-500/90 text-white' 
+        type === 'success'
+          ? 'bg-gradient-to-r from-emerald-500/90 to-green-500/90 text-white'
           : 'bg-gradient-to-r from-red-500/90 to-rose-500/90 text-white'
       }`}>
         {type === 'success' ? (
@@ -84,7 +100,7 @@ function Modal({ open, onClose, children }: { open: boolean; onClose: () => void
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
       <div
         className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl border border-white/20 animate-scale-in"
-        style={{ 
+        style={{
           zIndex: 10000,
           background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,255,0.95) 100%)',
         }}
@@ -98,11 +114,11 @@ function Modal({ open, onClose, children }: { open: boolean; onClose: () => void
 /* ─────────────────────────────────────────────
    상세보기 모달 내용
 ───────────────────────────────────────────── */
-function DetailModalContent({ 
-  schedule, 
+function DetailModalContent({
+  schedule,
   onClose,
-  onSubscriberClick 
-}: { 
+  onSubscriberClick,
+}: {
   schedule: DeadlineSchedule
   onClose: () => void
   onSubscriberClick: (sub: SubscriberDetail) => void
@@ -113,11 +129,6 @@ function DetailModalContent({
     return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   }
   const days = getDays()
-
-  const formatDate = (s: string) => {
-    const d = new Date(s)
-    return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
-  }
 
   const formatDateShort = (s: string) => {
     const d = new Date(s)
@@ -138,25 +149,36 @@ function DetailModalContent({
     return 'text-blue-600'
   }
 
-  // 연관 가입자 -> SubscriberDetail로 변환
-  const handleSubscriberClick = (sub: { id: string; name: string; employeeId: string; company: string; joinDate: string; balance: number }) => {
-    // memberList에서 해당 가입자 찾기
-    const member = memberList.find(m => 
-      m.name === sub.name || m.employeeId === sub.employeeId
-    )
-    
-    const detail: SubscriberDetail = {
-      id: sub.id,
-      employeeId: sub.employeeId,
-      name: sub.name,
-      company: sub.company,
-      department: member?.department,
-      accountType: member?.type || 'DC',
-      joinDate: sub.joinDate,
-      defaultOption: member?.defaultOption === '설정완료' ? 'Y' : member?.defaultOption === '미설정' ? 'N' : null,
-      balance: sub.balance,
+  const handleSubscriberClick = async (sub: { id: string; name: string; employeeId: string; company: string; joinDate: string; balance: number }) => {
+    try {
+      const fetched = await getPensionMemberDetail(Number(sub.id))
+      const detail: SubscriberDetail = {
+        id: String(fetched.id),
+        employeeId: String(fetched.id),
+        name: fetched.name,
+        company: fetched.company?.companyName ?? sub.company,
+        accountType: (fetched.company?.planType as 'DC' | 'DB' | 'IRP') ?? 'DB',
+        joinDate: fetched.retirement?.joinDate ?? sub.joinDate,
+        startDate: fetched.retirement?.startDate ?? undefined,
+        terminationDate: fetched.retirement?.terminationDate ?? undefined,
+        effectiveDate: fetched.retirement?.effectiveDate ?? undefined,
+        defaultOption: fetched.retirement?.defaultOption as 'Y' | 'N' | null ?? null,
+        employeeType: fetched.retirement?.employeeType ?? undefined,
+        balance: (fetched.retirement?.balance as number) ?? sub.balance,
+      }
+      onSubscriberClick(detail)
+    } catch {
+      onSubscriberClick({
+        id: sub.id,
+        employeeId: sub.employeeId,
+        name: sub.name,
+        company: sub.company,
+        accountType: 'DB',
+        joinDate: sub.joinDate,
+        defaultOption: null,
+        balance: sub.balance,
+      })
     }
-    onSubscriberClick(detail)
   }
 
   return (
@@ -173,61 +195,28 @@ function DetailModalContent({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500 flex-shrink-0 mr-2">
-          등록: {formatDateShort(schedule.createdAt)}
-        </div>
+        {schedule.createdAt && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 flex-shrink-0 mr-2">
+            등록: {formatDateShort(schedule.createdAt)}
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">
-
         {/* 일정 내용 */}
-        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200/60 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-indigo-600" />
-            </div>
-            <span className="text-sm font-bold text-slate-800">일정 내용</span>
-          </div>
-          <p className="text-sm text-slate-700 leading-relaxed bg-white/60 rounded-xl p-4 border border-slate-100">{schedule.content}</p>
-        </div>
-
-        {/* 기업 대상 - 가입자가 없을 때만 표시 */}
-        {schedule.targetType === '기업' && schedule.relatedCompanies && schedule.relatedCompanies.length > 0 && (!schedule.relatedSubscribers || schedule.relatedSubscribers.length === 0) && (
-          <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-blue-600" />
+        {schedule.content && (
+          <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200/60 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-indigo-600" />
               </div>
-              <span className="text-sm font-bold text-slate-800">기업 대상</span>
-              <span className="ml-auto text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{schedule.relatedCompanies.length}개 기업</span>
+              <span className="text-sm font-bold text-slate-800">일정 내용</span>
             </div>
-            <div className="space-y-2">
-              {schedule.relatedCompanies.map(company => (
-                <div key={company.id} className="flex items-center justify-between p-4 rounded-xl bg-white/80 border border-slate-100 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-sm">
-                      <Building2 className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{company.name}</p>
-                      <p className="text-xs text-slate-500">사업자번호: {company.businessNumber}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      company.planType === 'DC' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'
-                    }`}>
-                      {company.planType}형
-                    </span>
-                    <p className="text-xs text-slate-500 mt-1">{company.employeeCount.toLocaleString()}명</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-slate-700 leading-relaxed bg-white/60 rounded-xl p-4 border border-slate-100">{schedule.content}</p>
           </div>
         )}
 
-        {/* 연관 가입자 - 클릭 시 상세조회 */}
+        {/* 연관 가입자 */}
         {schedule.relatedSubscribers && schedule.relatedSubscribers.length > 0 && (
           <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -239,8 +228,8 @@ function DetailModalContent({
             </div>
             <div className="space-y-2">
               {schedule.relatedSubscribers.map(sub => (
-                <div 
-                  key={sub.id} 
+                <div
+                  key={sub.id}
                   onClick={() => handleSubscriberClick(sub)}
                   className="flex items-center justify-between p-4 rounded-xl bg-white/80 border border-slate-100 hover:shadow-md hover:border-cyan-200 transition-all cursor-pointer"
                 >
@@ -250,15 +239,33 @@ function DetailModalContent({
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900">{sub.name}</p>
-                      <p className="text-xs text-slate-500">{sub.company}</p>
-                      <p className="text-xs text-slate-400">사번: {sub.employeeId}</p>
+                      {sub.company && <p className="text-xs text-slate-500">{sub.company}</p>}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-slate-900">
-                      {sub.balance === 0 ? '신규 가입' : `${(sub.balance / 10000).toLocaleString()}만원`}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">가입일: {sub.joinDate}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 연관 기업 */}
+        {schedule.relatedCompanies && schedule.relatedCompanies.length > 0 && (!schedule.relatedSubscribers || schedule.relatedSubscribers.length === 0) && (
+          <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Building2 className="w-4 h-4 text-blue-600" />
+              </div>
+              <span className="text-sm font-bold text-slate-800">기업 대상</span>
+            </div>
+            <div className="space-y-2">
+              {schedule.relatedCompanies.map(company => (
+                <div key={company.id} className="flex items-center gap-3 p-4 rounded-xl bg-white/80 border border-slate-100">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-sm">
+                    <Building2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{company.name}</p>
+                    <p className="text-xs text-slate-500">사업자번호: {company.businessNumber}</p>
                   </div>
                 </div>
               ))}
@@ -280,7 +287,7 @@ function DetailModalContent({
 }
 
 /* ─────────────────────────────────────────────
-   일정 추가 모달 내용 - 가입자 검색/선택 기능
+   일정 추가 모달 내용
 ───────────────────────────────────────────── */
 function AddModalContent({
   onClose,
@@ -288,7 +295,7 @@ function AddModalContent({
   defaultDate,
 }: {
   onClose: () => void
-  onAdd: (s: DeadlineSchedule) => void
+  onAdd: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
   defaultDate?: string
 }) {
   const [form, setForm] = useState({
@@ -297,22 +304,24 @@ function AddModalContent({
     content: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
-  
-  // 가입자 검색/선택 상태
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [allMembers, setAllMembers] = useState<Employee[]>([])
   const [subscriberSearch, setSubscriberSearch] = useState('')
-  const [selectedSubscribers, setSelectedSubscribers] = useState<MemberData[]>([])
+  const [selectedSubscribers, setSelectedSubscribers] = useState<Employee[]>([])
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false)
 
-  // 검색된 가입자 목록
+  useEffect(() => {
+    getPensionMembers().then(setAllMembers).catch(() => {})
+  }, [])
+
   const filteredMembers = useMemo(() => {
     if (!subscriberSearch.trim()) return []
     const query = subscriberSearch.toLowerCase()
-    return memberList.filter(m => 
-      m.name.includes(query) || 
-      m.employeeId.toLowerCase().includes(query) ||
-      m.company.includes(query)
-    ).slice(0, 5)
-  }, [subscriberSearch])
+    return allMembers
+      .filter(m => m.name.toLowerCase().includes(query))
+      .slice(0, 5)
+  }, [subscriberSearch, allMembers])
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -323,45 +332,25 @@ function AddModalContent({
     return Object.keys(e).length === 0
   }
 
-  const handleSubmit = () => {
-    if (!validate()) return
-    const hasSubscriber = selectedSubscribers.length > 0
-    
-    // 가입자가 없을 경우 현재 기업 정보
-    const currentCompany = {
-      id: 'CURRENT-COMPANY',
-      name: 'IBK 퇴직연금',
-      businessNumber: '000-00-00000',
-      employeeCount: 0,
-      planType: 'DC' as const,
-      contractDate: new Date().toISOString().split('T')[0],
+  const handleSubmit = async () => {
+    if (!validate() || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      await onAdd(
+        form.title,
+        form.deadline,
+        form.content,
+        selectedSubscribers.map(m => m.id),
+      )
+      onClose()
+    } catch {
+      setErrors(prev => ({ ...prev, submit: '일정 추가에 실패했습니다. 다시 시도해주세요.' }))
+    } finally {
+      setIsSubmitting(false)
     }
-    
-    const newSchedule: DeadlineSchedule = {
-      id: `DL-${Date.now()}`,
-      title: form.title,
-      deadline: form.deadline,
-      content: form.content,
-      type: 'DC',
-      targetType: hasSubscriber ? '가입자' : '기업' as TargetType,
-      priority: 'medium',
-      status: '예정',
-      createdAt: new Date().toISOString().split('T')[0],
-      relatedSubscribers: hasSubscriber ? selectedSubscribers.map(m => ({
-        id: m.id,
-        name: m.name,
-        employeeId: m.employeeId,
-        company: m.company,
-        joinDate: m.joinDate,
-        balance: parseInt(m.balance.replace(/,/g, '')) || 0,
-      })) : undefined,
-      relatedCompanies: !hasSubscriber ? [currentCompany] : undefined,
-    }
-    onAdd(newSchedule)
-    onClose()
   }
 
-  const addSubscriber = (member: MemberData) => {
+  const addSubscriber = (member: Employee) => {
     if (!selectedSubscribers.find(s => s.id === member.id)) {
       setSelectedSubscribers(prev => [...prev, member])
     }
@@ -369,7 +358,7 @@ function AddModalContent({
     setShowSubscriberDropdown(false)
   }
 
-  const removeSubscriber = (id: string) => {
+  const removeSubscriber = (id: number) => {
     setSelectedSubscribers(prev => prev.filter(s => s.id !== id))
   }
 
@@ -403,7 +392,7 @@ function AddModalContent({
             </label>
             <input
               className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.title ? 'border-red-400' : 'border-slate-200'}`}
-              placeholder="예: DC형 운용지시 기한 도래"
+              placeholder="예: DB형 퇴직급여 산정 기한"
               value={form.title}
               onChange={e => f('title', e.target.value)}
             />
@@ -457,14 +446,13 @@ function AddModalContent({
             <span className="text-xs text-slate-400 ml-1">(선택)</span>
           </div>
 
-          {/* 가입자 검색 */}
           <div className="relative">
             <label className="text-xs font-semibold text-slate-600 mb-2 block">가입자 검색</label>
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white/80"
-                placeholder="이름, 사번, 소속기업으로 검색..."
+                placeholder="이름으로 검색..."
                 value={subscriberSearch}
                 onChange={e => {
                   setSubscriberSearch(e.target.value)
@@ -474,7 +462,6 @@ function AddModalContent({
               />
             </div>
 
-            {/* 검색 결과 드롭다운 */}
             {showSubscriberDropdown && filteredMembers.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-slate-200 shadow-xl z-50 max-h-60 overflow-y-auto">
                 {filteredMembers.map(member => (
@@ -488,26 +475,20 @@ function AddModalContent({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-900">{member.name}</p>
-                      <p className="text-xs text-slate-500">{member.company} / {member.department}</p>
+                      <p className="text-xs text-slate-500">{member.position || '직책 미지정'} · {member.status || ''}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      member.type === 'DC' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'
-                    }`}>
-                      {member.type}
-                    </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* 선택된 가입자 목록 */}
           {selectedSubscribers.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-slate-600">선택된 가입자 ({selectedSubscribers.length}명)</p>
               <div className="flex flex-wrap gap-2">
                 {selectedSubscribers.map(sub => (
-                  <div 
+                  <div
                     key={sub.id}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-cyan-200 text-sm"
                   >
@@ -515,7 +496,7 @@ function AddModalContent({
                       <User className="w-3 h-3 text-white" />
                     </div>
                     <span className="font-medium text-slate-700">{sub.name}</span>
-                    <span className="text-xs text-slate-400">{sub.company}</span>
+                    {sub.position && <span className="text-xs text-slate-400">{sub.position}</span>}
                     <button
                       onClick={() => removeSubscriber(sub.id)}
                       className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -528,21 +509,27 @@ function AddModalContent({
             </div>
           )}
         </div>
+
+        {errors.submit && (
+          <p className="text-xs text-red-500 text-center">{errors.submit}</p>
+        )}
       </div>
 
       <div className="mt-6 flex justify-end gap-3">
         <button
           onClick={onClose}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+          disabled={isSubmitting}
+          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50"
         >
           취소
         </button>
         <button
           onClick={handleSubmit}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-blue-500/25"
+          disabled={isSubmitting}
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
-          일정 추가
+          {isSubmitting ? '추가 중...' : '일정 추가'}
         </button>
       </div>
     </div>
@@ -560,7 +547,7 @@ function CalendarView({
   onComplete,
 }: {
   schedules: DeadlineSchedule[]
-  onAdd: (s: DeadlineSchedule) => void
+  onAdd: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
   onDelete: (id: string) => void
   onViewDetail: (s: DeadlineSchedule) => void
   onComplete: (id: string) => void
@@ -594,7 +581,6 @@ function CalendarView({
     return schedules.filter(s => s.deadline === dateStr)
   }
 
-  // 일정 색상: 미완료=노랑, 완료=초록, 초과=빨강
   const getScheduleColor = (s: DeadlineSchedule) => {
     if (s.status === '완료') return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' }
     const days = getDaysUntil(s.deadline)
@@ -608,16 +594,12 @@ function CalendarView({
 
   return (
     <div className="space-y-5">
-      {/* 캘린더 헤더 - 년월 강조 */}
       <div className="flex items-center justify-between">
         <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
           {year}년 {month}월
         </h3>
         <div className="flex items-center gap-2">
-          <button
-            onClick={prevMonth}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-          >
+          <button onClick={prevMonth} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
@@ -626,18 +608,13 @@ function CalendarView({
           >
             오늘
           </button>
-          <button
-            onClick={nextMonth}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-          >
+          <button onClick={nextMonth} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* 캘린더 그리드 */}
       <div className="rounded-2xl border border-slate-200/60 overflow-hidden bg-white/60">
-        {/* 요일 헤더 */}
         <div className="grid grid-cols-7 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/60">
           {DAYS.map((d, i) => (
             <div key={d} className={`py-3 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>
@@ -646,14 +623,11 @@ function CalendarView({
           ))}
         </div>
 
-        {/* 날짜 그리드 */}
         <div className="grid grid-cols-7">
-          {/* 빈 칸 */}
           {Array.from({ length: firstDayOfWeek }).map((_, i) => (
             <div key={`empty-${i}`} className="min-h-[90px] border-b border-r border-slate-100 bg-slate-50/30" />
           ))}
 
-          {/* 날짜 */}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1
             const daySchedules = getDateSchedules(day)
@@ -708,7 +682,6 @@ function CalendarView({
         </div>
       </div>
 
-      {/* 선택된 날짜 상세 */}
       {selectedDate && (
         <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-5 animate-slide-up">
           <div className="flex items-center justify-between mb-4">
@@ -744,8 +717,8 @@ function CalendarView({
                 const color = getScheduleColor(s)
                 const isCompleted = s.status === '완료'
                 return (
-                  <div 
-                    key={s.id} 
+                  <div
+                    key={s.id}
                     onClick={() => onViewDetail(s)}
                     className={`flex items-center gap-3 p-4 rounded-xl bg-white/80 border transition-all hover:shadow-md cursor-pointer ${
                       isCompleted ? 'border-emerald-200 opacity-70' : 'border-slate-200'
@@ -785,11 +758,12 @@ function CalendarView({
         </div>
       )}
 
-      {/* 날짜별 일정 추가 모달 */}
       <Modal open={!!showAddForDate} onClose={() => setShowAddForDate(null)}>
         <AddModalContent
           onClose={() => setShowAddForDate(null)}
-          onAdd={s => { onAdd(s); setShowAddForDate(null) }}
+          onAdd={async (title, dueDate, desc, empIds) => {
+            await onAdd(title, dueDate, desc, empIds)
+          }}
           defaultDate={showAddForDate || undefined}
         />
       </Modal>
@@ -801,40 +775,93 @@ function CalendarView({
    메인 컴포넌트
 ───────────────────────────────────────────── */
 export function DeadlineAlerts() {
-  const [schedules, setSchedules] = useState<DeadlineSchedule[]>(mockDeadlines)
+  const [schedules, setSchedules] = useState<DeadlineSchedule[]>([])
+  const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedSchedule, setSelectedSchedule] = useState<DeadlineSchedule | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  
-  // 가입자 상세보기 모달
   const [subscriberDetail, setSubscriberDetail] = useState<SubscriberDetail | null>(null)
 
-  const handleAdd = (s: DeadlineSchedule) => {
-    setSchedules(prev => [s, ...prev])
-    setToast({ message: '새 일정이 추가되었습니다.', type: 'success' })
-  }
-  
-  const handleDelete = (id: string) => {
-    setSchedules(prev => prev.filter(s => s.id !== id))
-    setToast({ message: '일정이 삭제되었습니다.', type: 'success' })
-  }
-  
-  const handleComplete = (id: string) => {
-    setSchedules(prev => prev.map(s => s.id === id ? { ...s, status: '완료' as const } : s))
-    setToast({ message: '처리 완료되었습니다.', type: 'success' })
+  useEffect(() => {
+    const controller = new AbortController()
+    getSchedulesDb({}, controller.signal)
+      .then(res => {
+        const items = res.schedules.map(item => {
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const deadline = new Date(item.due_date)
+          const isOverdue = deadline < today && item.status !== '완료'
+          return {
+            id: String(item.id),
+            title: item.title,
+            deadline: item.due_date,
+            content: '',
+            type: 'DB' as const,
+            targetType: '기업' as TargetType,
+            priority: 'medium' as const,
+            status: item.status === '완료' ? ('완료' as const) : isOverdue ? ('지연' as const) : ('예정' as const),
+            createdAt: '',
+          }
+        })
+        setSchedules(items)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+    return () => controller.abort()
+  }, [])
+
+  const handleViewDetail = async (schedule: DeadlineSchedule) => {
+    setSelectedSchedule(schedule)
+    const id = Number(schedule.id)
+    if (isNaN(id)) return
+    try {
+      const detail = await getScheduleDbDetail(id)
+      setSelectedSchedule(convertDetailToSchedule(detail))
+    } catch {
+      // 기본 데이터로 유지
+    }
   }
 
-  // 기일 임박(2주 이내) 및 초과 여부 계산
+  const handleAdd = async (title: string, dueDate: string, description: string, employeeIds: number[]) => {
+    const detail = await createScheduleDb({
+      title,
+      due_date: dueDate,
+      description: description || undefined,
+      employee_ids: employeeIds.length > 0 ? employeeIds : undefined,
+    })
+    const schedule = convertDetailToSchedule(detail)
+    setSchedules(prev => [schedule, ...prev])
+    setToast({ message: '새 일정이 추가되었습니다.', type: 'success' })
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteScheduleDb(Number(id))
+      setSchedules(prev => prev.filter(s => s.id !== id))
+      setToast({ message: '일정이 삭제되었습니다.', type: 'success' })
+    } catch {
+      setToast({ message: '일정 삭제에 실패했습니다.', type: 'error' })
+    }
+  }
+
+  const handleComplete = async (id: string) => {
+    try {
+      await completeScheduleDb(Number(id))
+      setSchedules(prev => prev.map(s => s.id === id ? { ...s, status: '완료' as const } : s))
+      setToast({ message: '처리 완료되었습니다.', type: 'success' })
+    } catch {
+      setToast({ message: '완료 처리에 실패했습니다.', type: 'error' })
+    }
+  }
+
   const getDaysUntil = (deadline: string) => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const d = new Date(deadline)
     return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   }
 
-  // 통계: 전체 / 기일임박(2주이내) / 초과 - 완료 제외
   const stats = useMemo(() => {
     const activeSchedules = schedules.filter(s => s.status !== '완료')
     return {
@@ -847,29 +874,23 @@ export function DeadlineAlerts() {
     }
   }, [schedules])
 
-  // 필터링 (목록에서는 완료 건 제외)
   const filteredSchedules = useMemo(() => {
     return schedules.filter(s => {
-      // 목록 뷰에서는 완료 건 제외
       if (s.status === '완료') return false
-      
       const days = getDaysUntil(s.deadline)
       const matchSearch = !searchQuery ||
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.relatedCompanies?.some(c => c.name.includes(searchQuery)) ||
-        s.relatedSubscribers?.some(sub => sub.name.includes(searchQuery))
-      
+        s.content.toLowerCase().includes(searchQuery.toLowerCase())
+
       let matchCategory = true
       if (filterCategory === 'imminent') {
         matchCategory = days >= 0 && days <= 14
       } else if (filterCategory === 'overdue') {
         matchCategory = days < 0
       }
-      
+
       return matchSearch && matchCategory
     }).sort((a, b) => {
-      // 초과 > 임박 > 예정 순으로 정렬
       const daysA = getDaysUntil(a.deadline)
       const daysB = getDaysUntil(b.deadline)
       if (daysA < 0 && daysB >= 0) return -1
@@ -886,7 +907,6 @@ export function DeadlineAlerts() {
     return { label: `D-${days}`, color: 'text-blue-600', bg: 'bg-blue-50' }
   }
 
-  // 날짜 포맷 (일자만)
   const formatDateShort = (dateStr: string) => {
     const d = new Date(dateStr)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -894,10 +914,9 @@ export function DeadlineAlerts() {
 
   return (
     <div className="space-y-6">
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* 헤더 - 아이콘 크기+컬러 다른 탭과 동일하게 */}
+      {/* 헤더 */}
       <div className="flex items-center justify-between animate-slide-up">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
@@ -910,7 +929,7 @@ export function DeadlineAlerts() {
         </div>
       </div>
 
-      {/* 통계 카드: 전체 / 기일임박(2주이내) / 초과 */}
+      {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-4">
         <button
           onClick={() => setFilterCategory('all')}
@@ -926,7 +945,7 @@ export function DeadlineAlerts() {
           </div>
           <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{stats.total}</p>
         </button>
-        
+
         <button
           onClick={() => setFilterCategory('imminent')}
           className={`glass rounded-2xl p-5 border transition-all hover:shadow-lg text-left ${
@@ -941,7 +960,7 @@ export function DeadlineAlerts() {
           </div>
           <p className="text-3xl font-bold text-amber-600">{stats.imminent}</p>
         </button>
-        
+
         <button
           onClick={() => setFilterCategory('overdue')}
           className={`glass rounded-2xl p-5 border transition-all hover:shadow-lg text-left ${
@@ -964,8 +983,8 @@ export function DeadlineAlerts() {
           <button
             onClick={() => setViewMode('list')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              viewMode === 'list' 
-                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md' 
+              viewMode === 'list'
+                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -975,8 +994,8 @@ export function DeadlineAlerts() {
           <button
             onClick={() => setViewMode('calendar')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              viewMode === 'calendar' 
-                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md' 
+              viewMode === 'calendar'
+                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -991,7 +1010,7 @@ export function DeadlineAlerts() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border/70 bg-white/80 backdrop-blur-sm text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                placeholder="일정명, 기업명, 가입자명 검색..."
+                placeholder="일정명, 내용 검색..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -1007,10 +1026,17 @@ export function DeadlineAlerts() {
         )}
       </div>
 
-      {/* 목록 뷰 - 간소화된 셀 */}
+      {/* 목록 뷰 */}
       {viewMode === 'list' && (
         <div className="space-y-3">
-          {filteredSchedules.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <Calendar className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-sm text-muted-foreground">일정을 불러오는 중...</p>
+            </div>
+          ) : filteredSchedules.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                 <Calendar className="w-8 h-8 text-slate-300" />
@@ -1025,7 +1051,7 @@ export function DeadlineAlerts() {
               return (
                 <div
                   key={schedule.id}
-                  onClick={() => setSelectedSchedule(schedule)}
+                  onClick={() => handleViewDetail(schedule)}
                   className={`glass rounded-2xl border transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer ${
                     isOverdue
                       ? 'border-red-200/70 bg-gradient-to-r from-red-50/50 to-rose-50/30'
@@ -1048,12 +1074,10 @@ export function DeadlineAlerts() {
                         </div>
                       </div>
 
-                      {/* D-day */}
                       <span className={`text-sm font-bold px-3 py-1.5 rounded-lg ${daysInfo.color} ${daysInfo.bg} flex-shrink-0`}>
                         {daysInfo.label}
                       </span>
 
-                      {/* 완료/삭제 버튼 */}
                       <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleComplete(schedule.id)}
@@ -1088,7 +1112,7 @@ export function DeadlineAlerts() {
             schedules={schedules}
             onAdd={handleAdd}
             onDelete={handleDelete}
-            onViewDetail={setSelectedSchedule}
+            onViewDetail={handleViewDetail}
             onComplete={handleComplete}
           />
         </div>
@@ -1112,7 +1136,7 @@ export function DeadlineAlerts() {
       <Modal open={showAddModal} onClose={() => setShowAddModal(false)}>
         <AddModalContent
           onClose={() => setShowAddModal(false)}
-          onAdd={s => { handleAdd(s); setShowAddModal(false) }}
+          onAdd={handleAdd}
         />
       </Modal>
 
