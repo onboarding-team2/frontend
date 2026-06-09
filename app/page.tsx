@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import Cookies from 'js-cookie' 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -49,8 +50,12 @@ export default function LoginPage() {
       }
 
       const data = await res.json()
+      console.log(data)
+     
       localStorage.setItem('token', data.token)
       localStorage.setItem('planType', data.planType)
+      Cookies.set('token', data.token, { expires: 1, path: '/' }) // 1일간 유지
+
       const plan = (data.planType as string)?.toLowerCase() ?? 'dc'
       router.push(`/pension/${plan}/dashboard`)
     } catch {
@@ -69,23 +74,23 @@ export default function LoginPage() {
 
   return (
     <div className="h-screen bg-background relative overflow-hidden">
-      {/* 배경 글로우 — 흰끼 도는 밝은 하늘 */}
+      {/* 배경 글로우 — develop 브랜치 반영 */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 -left-32 w-[600px] h-[600px] bg-sky-200/35 rounded-full blur-[140px]" />
         <div className="absolute bottom-1/4 -right-32 w-[600px] h-[600px] bg-sky-100/40 rounded-full blur-[140px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-white/50 rounded-full blur-[160px]" />
       </div>
 
-      {/* 3D IBK */}
+      {/* 3D IBK 배경 오브젝트 */}
       <div className="absolute inset-0 z-[1]">
         <IBKScene3D />
       </div>
 
       {/* 메인 레이아웃 */}
       <div className="relative z-10 px-16 lg:px-44 pt-28 pb-24 lg:pt-32 lg:pb-28 grid lg:grid-cols-[1.5fr_1fr] gap-6 items-start h-screen">
-        {/* LEFT */}
+        
+        {/* LEFT SECTION */}
         <div className="hidden lg:flex flex-col gap-6 min-w-0">
-          {/* 브랜드 + AI 기반 한 줄 */}
           <div className="flex items-center gap-4 mb-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/login/ibk-logo.svg" alt="IBK 로고" className="w-12 h-12 object-contain drop-shadow-md" />
@@ -106,7 +111,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* 피처 4개 */}
+          {/* 피처 4개 카드 (develop의 개선된 컴포넌트 구조 준수) */}
           <div className="grid grid-cols-4 gap-3">
             <FeatureCard icon={MessageCircle} title="AI 챗봇" desc="24시간 상담" tone="accent" />
             <FeatureCard icon={TrendingUp} title="현황 관리" desc="통계 및 모니터링" tone="primary" />
@@ -114,9 +119,8 @@ export default function LoginPage() {
             <FeatureCard icon={Shield} title="기일 알림" desc="자동 알림" tone="indigo" />
           </div>
 
-          {/* AI 챗봇 배너 — 이미지 위에 텍스트 오버레이 */}
+          {/* AI 챗봇 배너 */}
           <div className="group relative rounded-3xl overflow-hidden shadow-[0_20px_50px_-20px_rgba(37,99,235,0.4)] hover:shadow-[0_25px_60px_-20px_rgba(37,99,235,0.55)] hover:-translate-y-0.5 transition-all duration-300 h-[140px]">
-            {/* 배경 이미지 — 흰 여백 잘리도록 확대 */}
             <div className="absolute inset-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -124,11 +128,9 @@ export default function LoginPage() {
                 alt=""
                 className="w-full h-full object-cover scale-125"
               />
-              {/* 가독성용 미세 그라디언트 오버레이 */}
               <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-transparent to-transparent" />
             </div>
 
-            {/* 콘텐츠 오버레이 */}
             <div className="relative h-full flex items-center justify-between px-6 py-4 gap-4">
               <div className="min-w-0">
                 <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md">
@@ -146,7 +148,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* RIGHT — 글래스 폼 (좁고 길게) */}
+        {/* RIGHT SECTION — develop 브랜치의 컴팩트한 고성능 글래스 폼 채택 */}
         <div className="w-full max-w-[360px] mx-auto lg:ml-auto lg:mr-0">
           <div className="relative rounded-[28px] p-[0.5px] bg-gradient-to-br from-white/60 via-primary/15 to-accent/20 shadow-[0_30px_80px_-20px_rgba(37,99,235,0.35)]">
             <div className="relative rounded-[calc(28px-0.5px)] overflow-hidden bg-sky-50/70 backdrop-blur-2xl px-7 py-10">
@@ -159,6 +161,7 @@ export default function LoginPage() {
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-5">
+                  {/* 사업자번호 필드 */}
                   <div className="space-y-1.5">
                     <label htmlFor="businessNumber" className="text-xs font-medium text-foreground/80">
                       사업자번호
@@ -177,6 +180,7 @@ export default function LoginPage() {
                     </div>
                   </div>
 
+                  {/* 비밀번호 필드 */}
                   <div className="space-y-1.5">
                     <label htmlFor="password" className="text-xs font-medium text-foreground/80">
                       비밀번호
@@ -229,7 +233,7 @@ export default function LoginPage() {
                   </div>
                 </form>
 
-                {/* 푸터 칩 */}
+                {/* 하단 챗봇 인포 칩 */}
                 <div className="mt-5 rounded-2xl bg-white/40 backdrop-blur-sm border border-white/60 px-3 py-2.5 flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0">
                     <Sparkles className="w-4 h-4 text-primary" />
@@ -239,15 +243,18 @@ export default function LoginPage() {
                     <p className="text-[10px] text-muted-foreground leading-tight">문의사항은 고객센터 1566-2566</p>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   )
 }
 
+// develop 브랜치의 정적 타입 정의 및 FeatureCard 구현 준수
 type Tone = 'primary' | 'accent' | 'sky' | 'indigo'
 
 const TONE: Record<Tone, { iconBg: string; iconColor: string; arrow: string }> = {
