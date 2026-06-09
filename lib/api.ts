@@ -404,3 +404,59 @@ export async function completeScheduleDb(id: number): Promise<ScheduleDbDetail> 
   if (!res.ok) throw new Error(await readError(res, '일정 완료 처리 실패'))
   return res.json()
 }
+
+// ─── DB Dashboard API ─────────────────────────────────────────────────────
+
+export type DbDashboard = {
+  member_count: number
+  funded_amount: number
+  benefit_obligation: number
+  min_reserve: number
+  funding_ratio: number
+  shortfall_amount: number
+  additional_due_date: string | null
+  status: '적정' | '주의' | '추가납입필요'
+  base_date: string | null
+}
+
+export async function getDbDashboard(signal?: AbortSignal): Promise<DbDashboard> {
+  const res = await fetch(`${API_BASE}/pension/db/dashboard`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, 'DB 대시보드 조회 실패'))
+  return res.json()
+}
+
+// ─── DB Portfolio API ──────────────────────────────────────────────────────
+
+export type PortfolioCategoryItem = {
+  category: string
+  amount: number
+  percent: number
+}
+
+export type MaturingProductItem = {
+  name: string
+  maturity_date: string
+  principal: number
+  evaluated_amount: number
+}
+
+export type DbPortfolio = {
+  portfolio_items: PortfolioCategoryItem[]
+  maturing_products: MaturingProductItem[]
+  average_return_rate: number
+  principal_guaranteed_ratio: number
+}
+
+export async function getDbPortfolio(signal?: AbortSignal): Promise<DbPortfolio> {
+  const res = await fetch(`${API_BASE}/pension/db/portfolio`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, 'DB 포트폴리오 조회 실패'))
+  return res.json()
+}
