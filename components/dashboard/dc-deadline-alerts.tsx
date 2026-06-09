@@ -15,7 +15,7 @@ import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-mod
 import {
   Employee,
   ScheduleDcDetail,
-  getPensionMembers,
+  getDcMembers,
   getSchedulesDc,
   getScheduleDcDetail,
   createScheduleDc,
@@ -313,7 +313,7 @@ function AddModalContent({
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false)
 
   useEffect(() => {
-    getPensionMembers().then(setAllMembers).catch(() => {})
+    getDcMembers().then(setAllMembers).catch(() => {})
   }, [])
 
   const filteredMembers = useMemo(() => {

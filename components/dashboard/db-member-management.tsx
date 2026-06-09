@@ -83,6 +83,17 @@ export function MemberManagement() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deletingMember, setDeletingMember] = useState<Member | null>(null)
 
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [newMember, setNewMember] = useState<Omit<Member, 'id'>>({
+    name: '',
+    joinDate: '',
+    irpAccount: '미개설',
+    balance: '',
+    status: '재직',
+  })
+  const [regEmployeeType, setRegEmployeeType] = useState<'EMPLOYEE' | 'EXECUTIVE'>('EMPLOYEE')
+  const [regRrn, setRegRrn] = useState('')
+
   const [subscriberDetail, setSubscriberDetail] = useState<SubscriberDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
@@ -94,6 +105,20 @@ export function MemberManagement() {
       .finally(() => setLoading(false))
     return () => controller.abort()
   }, [])
+
+  const formatRrn = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 13)
+    if (digits.length <= 6) return digits
+    return `${digits.slice(0, 6)}-${digits.slice(6)}`
+  }
+
+  const handleRegisterSave = () => {
+    if (!newMember.name || !newMember.joinDate) return
+    setMembers(prev => [...prev, { ...newMember, id: String(Date.now()) }])
+    setIsRegisterOpen(false)
+    setNewMember({ name: '', joinDate: '', irpAccount: '미개설', balance: '', status: '재직' })
+    setRegRrn('')
+  }
 
   const filteredMembers = members.filter((member) => {
     const matchesSearch = member.name.includes(searchTerm)
@@ -160,7 +185,7 @@ export function MemberManagement() {
             <p className="text-muted-foreground">퇴직연금 가입자 정보를 관리합니다</p>
           </div>
         </div>
-        <Button className="btn-hover gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
+        <Button onClick={() => setIsRegisterOpen(true)} className="btn-hover gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
           <Plus className="w-4 h-4" />
           가입자 등록
         </Button>
@@ -398,6 +423,103 @@ export function MemberManagement() {
               취소
             </Button>
             <Button onClick={handleEditSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+              저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Register Member Dialog */}
+      <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
+        <DialogContent className="sm:max-w-[500px] glass-strong border-white/30">
+          <DialogHeader>
+            <DialogTitle>가입자 등록</DialogTitle>
+            <DialogDescription>
+              새 가입자 정보를 입력합니다. 등록하려면 저장 버튼을 클릭하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reg-name">이름</Label>
+                <Input
+                  id="reg-name"
+                  value={newMember.name}
+                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-joinDate">가입일</Label>
+                <Input
+                  id="reg-joinDate"
+                  type="date"
+                  value={newMember.joinDate}
+                  onChange={(e) => setNewMember({ ...newMember, joinDate: e.target.value })}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reg-rrn">주민번호</Label>
+                <Input
+                  id="reg-rrn"
+                  value={regRrn}
+                  onChange={(e) => setRegRrn(formatRrn(e.target.value))}
+                  placeholder="000000-0000000"
+                  maxLength={14}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-employeeType">임직원</Label>
+                <Select
+                  value={regEmployeeType}
+                  onValueChange={(value: 'EMPLOYEE' | 'EXECUTIVE') => setRegEmployeeType(value)}
+                >
+                  <SelectTrigger className="bg-white/50 border-white/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EMPLOYEE">EMPLOYEE</SelectItem>
+                    <SelectItem value="EXECUTIVE">EXECUTIVE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reg-irpAccount">IRP계좌</Label>
+                <Select
+                  value={newMember.irpAccount}
+                  onValueChange={(value: '개설완료' | '미개설') => setNewMember({ ...newMember, irpAccount: value })}
+                >
+                  <SelectTrigger className="bg-white/50 border-white/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="개설완료">개설완료</SelectItem>
+                    <SelectItem value="미개설">미개설</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-balance">적립금</Label>
+                <Input
+                  id="reg-balance"
+                  value={newMember.balance}
+                  onChange={(e) => setNewMember({ ...newMember, balance: e.target.value })}
+                  className="bg-white/50 border-white/50"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRegisterOpen(false)} className="border-white/50 bg-white/30">
+              취소
+            </Button>
+            <Button onClick={handleRegisterSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
               저장
             </Button>
           </DialogFooter>
