@@ -86,6 +86,36 @@ export async function getPensionMembers(signal?: AbortSignal): Promise<Employee[
   }))
 }
 
+async function fetchMembersByPlan(plan: 'dc' | 'db', signal?: AbortSignal): Promise<Employee[]> {
+  const res = await fetch(`${API_BASE}/pension/${plan}/members`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '가입자 목록 조회 실패'))
+  const result = await res.json() as Record<string, unknown>[]
+  return result.map((item) => ({
+    id: item.id as number,
+    name: item.name as string,
+    position: (item.position as string) ?? null,
+    startDate: ((item.startDate ?? item.start_date) as string) ?? null,
+    joinDate: ((item.joinDate ?? item.join_date) as string) ?? null,
+    hasIrpAccount: ((item.hasIrpAccount ?? item.has_irp_account) as string) ?? null,
+    defaultOption: ((item.defaultOption ?? item.default_option) as string) ?? null,
+    balance: (item.balance as number) ?? null,
+    contributionPaid: (item.contributionPaid as boolean) ?? null,
+    status: (item.status as EmployeeStatus) ?? null,
+  }))
+}
+
+export async function getDbMembers(signal?: AbortSignal): Promise<Employee[]> {
+  return fetchMembersByPlan('db', signal)
+}
+
+export async function getDcMembers(signal?: AbortSignal): Promise<Employee[]> {
+  return fetchMembersByPlan('dc', signal)
+}
+
 export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
   return pensionFetch('/deadlines', signal) as Promise<ExpectedRetiree[]>
 }
