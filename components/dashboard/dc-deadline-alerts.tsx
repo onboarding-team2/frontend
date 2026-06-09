@@ -21,6 +21,7 @@ import {
   createScheduleDc,
   deleteScheduleDc,
   completeScheduleDc,
+  getDcMemberDetail,
 } from '@/lib/api'
 
 type ViewMode = 'list' | 'calendar'
@@ -148,18 +149,37 @@ function DetailModalContent({
     return 'text-blue-600'
   }
 
-  const handleSubscriberClick = (sub: { id: string; name: string; employeeId: string; company: string; joinDate: string; balance: number }) => {
-    const detail: SubscriberDetail = {
-      id: sub.id,
-      employeeId: sub.employeeId,
-      name: sub.name,
-      company: sub.company,
-      accountType: 'DC',
-      joinDate: sub.joinDate,
-      defaultOption: null,
-      balance: sub.balance,
+  const handleSubscriberClick = async (sub: { id: string; name: string; employeeId: string; company: string; joinDate: string; balance: number }) => {
+    try {
+      const fetched = await getDcMemberDetail(Number(sub.id))
+      const detail: SubscriberDetail = {
+        id: String(fetched.id),
+        employeeId: String(fetched.id),
+        name: fetched.name,
+        company: fetched.company?.companyName ?? sub.company,
+        accountType: (fetched.company?.planType as 'DC' | 'DB' | 'IRP') ?? 'DC',
+        joinDate: fetched.retirement?.joinDate ?? sub.joinDate,
+        startDate: fetched.retirement?.startDate ?? undefined,
+        terminationDate: fetched.retirement?.terminationDate ?? undefined,
+        effectiveDate: fetched.retirement?.effectiveDate ?? undefined,
+        defaultOption: fetched.retirement?.defaultOption as 'Y' | 'N' | null ?? null,
+        employeeType: fetched.retirement?.employeeType ?? undefined,
+        balance: (fetched.retirement?.balance as number) ?? sub.balance,
+      }
+      onSubscriberClick(detail)
+    } catch {
+      // 조회 실패 시 기본 정보로 표시
+      onSubscriberClick({
+        id: sub.id,
+        employeeId: sub.employeeId,
+        name: sub.name,
+        company: sub.company,
+        accountType: 'DC',
+        joinDate: sub.joinDate,
+        defaultOption: null,
+        balance: sub.balance,
+      })
     }
-    onSubscriberClick(detail)
   }
 
   return (

@@ -3,7 +3,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 export const DEMO_COMPANY_ID = 'C005'
 
 function authHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  if (typeof window === 'undefined') return {}
+  const cookieRaw = document.cookie.match(/(?:^|;\s*)token=([^;]*)/)?.[1]
+  const token =
+    localStorage.getItem('token') ??
+    (cookieRaw ? decodeURIComponent(cookieRaw) : null)
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
@@ -73,6 +77,9 @@ export async function getPensionMembers(signal?: AbortSignal): Promise<Employee[
     name: item.name as string,
     position: (item.position as string) ?? null,
     startDate: ((item.startDate ?? item.start_date) as string) ?? null,
+    joinDate: ((item.joinDate ?? item.join_date) as string) ?? null,
+    hasIrpAccount: ((item.hasIrpAccount ?? item.has_irp_account) as string) ?? null,
+    defaultOption: ((item.defaultOption ?? item.default_option) as string) ?? null,
     balance: (item.balance as number) ?? null,
     contributionPaid: (item.contributionPaid as boolean) ?? null,
     status: (item.status as EmployeeStatus) ?? null,
@@ -95,6 +102,9 @@ export type Employee = {
   name: string
   position: string | null
   startDate: string | null
+  joinDate: string | null
+  hasIrpAccount: string | null
+  defaultOption: string | null
   balance: number | null
   contributionPaid: boolean | null
   status: EmployeeStatus | null
@@ -275,5 +285,15 @@ export async function completeScheduleDc(id: number): Promise<ScheduleDcDetail> 
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(await readError(res, '일정 완료 처리 실패'))
+  return res.json()
+}
+
+export async function getDcMemberDetail(id: number, signal?: AbortSignal): Promise<EmployeeDetail> {
+  const res = await fetch(`${API_BASE}/pension/dc/members/${id}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '가입자 상세 조회 실패'))
   return res.json()
 }

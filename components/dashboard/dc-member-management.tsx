@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Search, Plus, Edit2, Trash2, Filter, Download, ChevronLeft, ChevronRight, Users } from 'lucide-react'
+import { getPensionMembers, getDcMemberDetail, EmployeeDetail } from '@/lib/api'
+import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
 
 interface Member {
   id: string
@@ -41,19 +43,39 @@ interface Member {
   balance: string
 }
 
-const initialMembers: Member[] = [
-  { id: '1', name: '홍길동', joinDate: '2020-03-15', irpAccount: '개설완료', defaultOption: '설정완료', balance: '45,230,000' },
-  { id: '2', name: '김영희', joinDate: '2019-07-20', irpAccount: '미개설', defaultOption: '미설정', balance: '67,890,000' },
-  { id: '3', name: '이철수', joinDate: '2018-01-10', irpAccount: '개설완료', defaultOption: '-', balance: '89,120,000' },
-  { id: '4', name: '박지민', joinDate: '2021-05-05', irpAccount: '개설완료', defaultOption: '설정완료', balance: '23,450,000' },
-  { id: '5', name: '최수진', joinDate: '2017-09-12', irpAccount: '미개설', defaultOption: '-', balance: '112,340,000' },
-  { id: '6', name: '정민수', joinDate: '2022-02-28', irpAccount: '미개설', defaultOption: '미설정', balance: '15,670,000' },
-  { id: '7', name: '강하나', joinDate: '2020-11-15', irpAccount: '개설완료', defaultOption: '설정완료', balance: '38,900,000' },
-  { id: '8', name: '윤서연', joinDate: '2019-04-22', irpAccount: '개설완료', defaultOption: '-', balance: '72,100,000' },
-]
+function toMember(item: Awaited<ReturnType<typeof getPensionMembers>>[0]): Member {
+  return {
+    id: String(item.id),
+    name: item.name,
+    joinDate: item.joinDate ?? '-',
+    irpAccount: item.hasIrpAccount === 'Y' ? '개설완료' : '미개설',
+    defaultOption:
+      item.defaultOption === 'Y' ? '설정완료' :
+      item.defaultOption === 'N' ? '미설정' : '-',
+    balance: item.balance != null ? item.balance.toLocaleString() : '-',
+  }
+}
+
+function toSubscriberDetail(detail: EmployeeDetail): SubscriberDetail {
+  return {
+    id: String(detail.id),
+    employeeId: String(detail.id),
+    name: detail.name,
+    company: detail.company?.companyName ?? '',
+    accountType: (detail.company?.planType as 'DC' | 'DB' | 'IRP') ?? 'DC',
+    joinDate: detail.retirement?.joinDate ?? '',
+    startDate: detail.retirement?.startDate ?? undefined,
+    terminationDate: detail.retirement?.terminationDate ?? undefined,
+    effectiveDate: detail.retirement?.effectiveDate ?? undefined,
+    defaultOption: detail.retirement?.defaultOption as 'Y' | 'N' | null ?? null,
+    employeeType: detail.retirement?.employeeType ?? undefined,
+    balance: (detail.retirement?.balance as number) ?? 0,
+  }
+}
 
 export function MemberManagement() {
-  const [members, setMembers] = useState<Member[]>(initialMembers)
+  const [members, setMembers] = useState<Member[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterIrp, setFilterIrp] = useState<'all' | '개설완료' | '미개설'>('all')
   const [filterDefault, setFilterDefault] = useState<'all' | 'set' | 'unset'>('all')
@@ -75,6 +97,18 @@ export function MemberManagement() {
   const [regEmployeeType, setRegEmployeeType] = useState<'EMPLOYEE' | 'EXECUTIVE'>('EMPLOYEE')
   const [regRrn, setRegRrn] = useState('')
 
+  const [subscriberDetail, setSubscriberDetail] = useState<SubscriberDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    getPensionMembers(controller.signal)
+      .then(data => setMembers(data.map(toMember)))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+    return () => controller.abort()
+  }, [])
+
   const formatRrn = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 13)
     if (digits.length <= 6) return digits
@@ -90,6 +124,28 @@ export function MemberManagement() {
       (filterDefault === 'unset' && member.defaultOption === '미설정')
     return matchesSearch && matchesIrp && matchesDefault
   })
+
+  const handleNameClick = async (member: Member) => {
+    setDetailLoading(true)
+    try {
+      const detail = await getDcMemberDetail(Number(member.id))
+      setSubscriberDetail(toSubscriberDetail(detail))
+    } catch {
+      // 상세 조회 실패 시 기본 정보로 모달 표시
+      setSubscriberDetail({
+        id: member.id,
+        employeeId: member.id,
+        name: member.name,
+        company: '',
+        accountType: 'DC',
+        joinDate: member.joinDate !== '-' ? member.joinDate : '',
+        defaultOption: member.defaultOption === '설정완료' ? 'Y' : member.defaultOption === '미설정' ? 'N' : null,
+        balance: 0,
+      })
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   const handleEdit = (member: Member) => {
     setEditingMember({ ...member })
@@ -245,62 +301,82 @@ export function MemberManagement() {
                 </tr>
               </thead>
               <tbody>
-                {filteredMembers.map((member, idx) => (
-                  <tr
-                    key={member.id}
-                    className="border-b border-white/20 hover:bg-white/40 transition-all duration-300 animate-slide-up"
-                    style={{ animationDelay: `${(idx + 3) * 50}ms` }}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center transition-transform duration-300 hover:scale-110">
-                          <span className="text-xs font-semibold text-primary">{member.name.charAt(0)}</span>
-                        </div>
-                        <span className="font-medium text-foreground">{member.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-sm text-muted-foreground">{member.joinDate}</td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-300 hover:scale-105 ${
-                        member.irpAccount === '개설완료'
-                          ? 'bg-emerald-100 text-emerald-600'
-                          : 'bg-red-100 text-red-500'
-                      }`}>
-                        {member.irpAccount}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {member.defaultOption === '미설정' ? (
-                        <span className="px-3 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-500 transition-all duration-300 hover:scale-105">
-                          미설정
-                        </span>
-                      ) : member.defaultOption === '설정완료' ? (
-                        <span className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-600 transition-all duration-300 hover:scale-105">
-                          설정완료
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-sm text-right font-medium text-foreground">{member.balance}원</td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => handleEdit(member)}
-                          className="p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 hover:scale-110 active:scale-95"
-                        >
-                          <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(member)}
-                          className="p-2 rounded-lg hover:bg-red-100 transition-all duration-300 hover:scale-110 active:scale-95"
-                        >
-                          <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                        </button>
-                      </div>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                      데이터를 불러오는 중...
                     </td>
                   </tr>
-                ))}
+                ) : filteredMembers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                      가입자가 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMembers.map((member, idx) => (
+                    <tr
+                      key={member.id}
+                      className="border-b border-white/20 hover:bg-white/40 transition-all duration-300 animate-slide-up"
+                      style={{ animationDelay: `${(idx + 3) * 50}ms` }}
+                    >
+                      <td className="p-4">
+                        <button
+                          onClick={() => handleNameClick(member)}
+                          disabled={detailLoading}
+                          className="flex items-center gap-3 hover:opacity-70 transition-opacity text-left disabled:opacity-50"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                            <span className="text-xs font-semibold text-primary">{member.name.charAt(0)}</span>
+                          </div>
+                          <span className="font-medium text-foreground underline-offset-2 hover:underline">{member.name}</span>
+                        </button>
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground">{member.joinDate}</td>
+                      <td className="p-4">
+                        <span className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-300 hover:scale-105 ${
+                          member.irpAccount === '개설완료'
+                            ? 'bg-emerald-100 text-emerald-600'
+                            : 'bg-red-100 text-red-500'
+                        }`}>
+                          {member.irpAccount}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {member.defaultOption === '미설정' ? (
+                          <span className="px-3 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-500 transition-all duration-300 hover:scale-105">
+                            미설정
+                          </span>
+                        ) : member.defaultOption === '설정완료' ? (
+                          <span className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-600 transition-all duration-300 hover:scale-105">
+                            설정완료
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="p-4 text-sm text-right font-medium text-foreground">
+                        {member.balance !== '-' ? `${member.balance}원` : '-'}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleEdit(member)}
+                            className="p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 hover:scale-110 active:scale-95"
+                          >
+                            <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(member)}
+                            className="p-2 rounded-lg hover:bg-red-100 transition-all duration-300 hover:scale-110 active:scale-95"
+                          >
+                            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -547,6 +623,13 @@ export function MemberManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 가입자 상세 모달 */}
+      <SubscriberDetailModal
+        subscriber={subscriberDetail}
+        open={!!subscriberDetail}
+        onClose={() => setSubscriberDetail(null)}
+      />
     </div>
   )
 }
