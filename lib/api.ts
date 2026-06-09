@@ -308,3 +308,99 @@ export async function getPensionMemberDetail(id: number, signal?: AbortSignal): 
   if (!res.ok) throw new Error(await readError(res, '가입자 상세 조회 실패'))
   return res.json()
 }
+
+// ─── Schedule DB API ───────────────────────────────────────────────────────
+
+export type ScheduleDbItem = {
+  id: number
+  title: string
+  due_date: string
+  status: string
+  d_day: string
+}
+
+export type ScheduleDbResponse = {
+  total_count: number
+  imminent_count: number
+  overdue_count: number
+  schedules: ScheduleDbItem[]
+}
+
+export type ScheduleDbTargetEmployee = {
+  employee_id: number
+  name: string
+  company_name: string | null
+}
+
+export type ScheduleDbDetail = {
+  id: number
+  title: string
+  due_date: string
+  created_date: string | null
+  description: string | null
+  status: string
+  d_day: string
+  company_name: string | null
+  brn: string | null
+  plan_type: string | null
+  target_employees: ScheduleDbTargetEmployee[]
+}
+
+export async function getSchedulesDb(
+  params?: { period?: number; keyword?: string },
+  signal?: AbortSignal,
+): Promise<ScheduleDbResponse> {
+  const qs = new URLSearchParams()
+  if (params?.period != null) qs.set('period', String(params.period))
+  if (params?.keyword) qs.set('keyword', params.keyword)
+  const query = qs.toString()
+  const res = await fetch(`${API_BASE}/schedules/db${query ? '?' + query : ''}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 목록 조회 실패'))
+  return res.json()
+}
+
+export async function getScheduleDbDetail(id: number, signal?: AbortSignal): Promise<ScheduleDbDetail> {
+  const res = await fetch(`${API_BASE}/schedules/db/${id}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 상세 조회 실패'))
+  return res.json()
+}
+
+export async function createScheduleDb(data: {
+  title: string
+  due_date: string
+  description?: string
+  employee_ids?: number[]
+}): Promise<ScheduleDbDetail> {
+  const res = await fetch(`${API_BASE}/schedules/db`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 추가 실패'))
+  return res.json()
+}
+
+export async function deleteScheduleDb(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/schedules/db/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 삭제 실패'))
+}
+
+export async function completeScheduleDb(id: number): Promise<ScheduleDbDetail> {
+  const res = await fetch(`${API_BASE}/schedules/db/${id}/complete`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 완료 처리 실패'))
+  return res.json()
+}
