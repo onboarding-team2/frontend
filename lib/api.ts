@@ -181,3 +181,99 @@ async function readError(res: Response, fallback: string): Promise<string> {
     return `${fallback} (HTTP ${res.status})`
   }
 }
+
+// ─── Schedule DC API ───────────────────────────────────────────────────────
+
+export type ScheduleDcItem = {
+  id: number
+  title: string
+  due_date: string
+  status: string
+  d_day: string
+}
+
+export type ScheduleDcResponse = {
+  total_count: number
+  imminent_count: number
+  overdue_count: number
+  schedules: ScheduleDcItem[]
+}
+
+export type ScheduleDcTargetEmployee = {
+  employee_id: number
+  name: string
+  company_name: string | null
+}
+
+export type ScheduleDcDetail = {
+  id: number
+  title: string
+  due_date: string
+  created_date: string | null
+  description: string | null
+  status: string
+  d_day: string
+  company_name: string | null
+  brn: string | null
+  plan_type: string | null
+  target_employees: ScheduleDcTargetEmployee[]
+}
+
+export async function getSchedulesDc(
+  params?: { period?: number; keyword?: string },
+  signal?: AbortSignal,
+): Promise<ScheduleDcResponse> {
+  const qs = new URLSearchParams()
+  if (params?.period != null) qs.set('period', String(params.period))
+  if (params?.keyword) qs.set('keyword', params.keyword)
+  const query = qs.toString()
+  const res = await fetch(`${API_BASE}/schedules${query ? '?' + query : ''}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 목록 조회 실패'))
+  return res.json()
+}
+
+export async function getScheduleDcDetail(id: number, signal?: AbortSignal): Promise<ScheduleDcDetail> {
+  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 상세 조회 실패'))
+  return res.json()
+}
+
+export async function createScheduleDc(data: {
+  title: string
+  due_date: string
+  description?: string
+  employee_ids?: number[]
+}): Promise<ScheduleDcDetail> {
+  const res = await fetch(`${API_BASE}/schedules`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 추가 실패'))
+  return res.json()
+}
+
+export async function deleteScheduleDc(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 삭제 실패'))
+}
+
+export async function completeScheduleDc(id: number): Promise<ScheduleDcDetail> {
+  const res = await fetch(`${API_BASE}/schedules/${id}/complete`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 완료 처리 실패'))
+  return res.json()
+}
