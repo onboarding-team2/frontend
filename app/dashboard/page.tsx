@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { DBOverview } from '@/components/dashboard/db-overview'
 import { MemberManagement } from '@/components/dashboard/dc-member-management'
 import { DeadlineAlerts } from '@/components/dashboard/dc-deadline-alerts'
-import { DocumentForms } from '@/components/dashboard/document-forms'
+import { DocumentForms } from '@/components/dashboard/dc-document-forms'
 import type { TabType } from '@/lib/types'
 
 export default function DashboardPage() {
