@@ -12,16 +12,20 @@ export function getPlanType(): 'DC' | 'DB' | 'IRP' | null {
   return (localStorage.getItem('planType') as 'DC' | 'DB' | 'IRP' | null)
 }
 
-export type MonthlyPayment = {
-  month: number
-  amount: number | null
-  paid: boolean
+export type DefaultOptionMember = {
+  name: string
+  join_date: string
+  days_elapsed: number
 }
 
-export type DcContributionStatus = {
-  year: number
-  expectedAmount: number
-  payments: MonthlyPayment[]
+export type DcDashboard = {
+  total_balance: number
+  total_employee: number
+  default_option_not_selected: number
+  default_option_members: DefaultOptionMember[]
+  default_option_summary: string | null
+  this_month_contribution: number
+  contribution_due_date: string | null
 }
 
 export type ExpectedRetiree = {
@@ -43,12 +47,34 @@ async function pensionFetch(path: string, signal?: AbortSignal): Promise<unknown
   return res.json()
 }
 
-export async function getPensionDashboard(signal?: AbortSignal): Promise<DcContributionStatus> {
-  return pensionFetch('/dashboard', signal) as Promise<DcContributionStatus>
+export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashboard> {
+  const r = await pensionFetch('/dashboard', signal) as Record<string, unknown>
+  return {
+    total_balance: (r.total_balance ?? r.totalBalance ?? 0) as number,
+    total_employee: (r.total_employee ?? r.totalEmployee ?? 0) as number,
+    default_option_not_selected: (r.default_option_not_selected ?? r.defaultOptionNotSelected ?? 0) as number,
+    default_option_members: ((r.default_option_members ?? r.defaultOptionMembers ?? []) as Record<string, unknown>[]).map((m) => ({
+      name: m.name as string,
+      join_date: (m.join_date ?? m.joinDate ?? '') as string,
+      days_elapsed: (m.days_elapsed ?? m.daysElapsed ?? 0) as number,
+    })),
+    default_option_summary: (r.default_option_summary ?? r.defaultOptionSummary ?? null) as string | null,
+    this_month_contribution: (r.this_month_contribution ?? r.thisMonthContribution ?? 0) as number,
+    contribution_due_date: (r.contribution_due_date ?? r.contributionDueDate ?? null) as string | null,
+  }
 }
 
-export async function getPensionMembers(signal?: AbortSignal): Promise<unknown> {
-  return pensionFetch('/members', signal)
+export async function getPensionMembers(signal?: AbortSignal): Promise<Employee[]> {
+  const result = await pensionFetch('/members', signal) as Record<string, unknown>[]
+  return result.map((item) => ({
+    id: item.id as number,
+    name: item.name as string,
+    position: (item.position as string) ?? null,
+    startDate: ((item.startDate ?? item.start_date) as string) ?? null,
+    balance: (item.balance as number) ?? null,
+    contributionPaid: (item.contributionPaid as boolean) ?? null,
+    status: (item.status as EmployeeStatus) ?? null,
+  }))
 }
 
 export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
@@ -64,13 +90,11 @@ export type EmployeeStatus = '재직' | '퇴직'
 
 export type Employee = {
   id: number
-  memberId: string
   name: string
   position: string | null
-  joinDate: string | null
-  planType: PlanType | null
+  startDate: string | null
   balance: number | null
-  contributionPaid: boolean
+  contributionPaid: boolean | null
   status: EmployeeStatus | null
 }
 

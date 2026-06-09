@@ -1,19 +1,19 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { usePathname, useRouter, useParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
 import { ChatBot } from '@/components/dashboard/chatbot'
 import type { TabType } from '@/lib/types'
 
-export default function PensionLayout({ children }: { children: React.ReactNode }) {
+export default function DCLayout({ children }: { children: React.ReactNode }) {
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-background flex">
       <Suspense fallback={null}>
-        <PensionSidebar />
+        <DCSidebar />
       </Suspense>
       <div className="flex-1 flex flex-col min-h-screen">
         <Header onChatOpen={() => setIsChatOpen(true)} />
@@ -24,11 +24,9 @@ export default function PensionLayout({ children }: { children: React.ReactNode 
   )
 }
 
-function PensionSidebar() {
+function DCSidebar() {
   const router = useRouter()
   const pathname = usePathname()
-  const params = useParams()
-  const plan = params.plan as string
 
   const activeTab: TabType = pathname.endsWith('/members')
     ? 'members'
@@ -40,7 +38,7 @@ function PensionSidebar() {
 
   const handleTabChange = (tab: TabType) => {
     const segment = tab === 'overview' ? 'dashboard' : tab
-    router.push(`/pension/${plan}/${segment}`)
+    router.push(`/pension/dc/${segment}`)
   }
 
   return <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
