@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Building2,
@@ -9,21 +10,15 @@ import {
   AlertTriangle,
   CalendarClock,
   PieChart as PieChartIcon,
-  ArrowUp,
 } from 'lucide-react'
+import { getDbDashboard, DbDashboard, getDbPortfolio, DbPortfolio } from '@/lib/api'
+import { STATUS_CONFIG } from '@/lib/statusConfig'
 
-const portfolioItems = [
-  { name: '원리금보장 (정기예금)', percent: 52, amount: '22.2억', color: '#2563eb' },
-  { name: '채권형 펀드', percent: 23, amount: '9.8억', color: '#15803d' },
-  { name: '혼합형 펀드', percent: 15, amount: '6.4억', color: '#d97706' },
-  { name: 'MMF', percent: 10, amount: '4.2억', color: '#94a3b8' },
-]
-
-const maturingProducts = [
-  { name: 'IBK 정기예금 A', due: '만기 06.15', amount: '8.4억', dday: 'D-20', tone: 'danger' as const },
-  { name: 'IBK 정기예금 B', due: '만기 06.30', amount: '3.2억', dday: 'D-35', tone: 'warning' as const },
-  { name: '채권형 펀드 C', due: '만기 07.20', amount: '2.1억', dday: 'D-55', tone: 'info' as const },
-]
+const CATEGORY_COLORS: Record<string, string> = {
+  '정기예금': '#2563eb',
+  '이율보증형보험': '#15803d',
+  'ELB 및 ELD': '#d97706',
+}
 
 const ddayToneClass: Record<'danger' | 'warning' | 'info', string> = {
   danger: 'bg-red-100 text-red-500',
@@ -31,9 +26,52 @@ const ddayToneClass: Record<'danger' | 'warning' | 'info', string> = {
   info: 'bg-sky-100 text-sky-600',
 }
 
-const FUNDING_RATIO = 83.0
+function getDdayTone(dateStr: string): 'danger' | 'warning' | 'info' {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.round((new Date(dateStr).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (days <= 30) return 'danger'
+  if (days <= 60) return 'warning'
+  return 'info'
+}
+
+function formatDue(dateStr: string): string {
+  const d = new Date(dateStr)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `만기 ${mm}.${dd}`
+}
+
+function toEok(won: number): string {
+  return (won / 100_000_000).toFixed(1)
+}
+
+function toDday(dateStr: string | null): string | null {
+  if (!dateStr) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(dateStr)
+  const days = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (days < 0) return `D+${Math.abs(days)}`
+  if (days === 0) return 'D-Day'
+  return `D-${days}`
+}
+
 
 export function DBOverview() {
+  const [data, setData] = useState<DbDashboard | null>(null)
+  const [portfolio, setPortfolio] = useState<DbPortfolio | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    getDbDashboard(controller.signal).then(setData).catch(() => {})
+    getDbPortfolio(controller.signal).then(setPortfolio).catch(() => {})
+    return () => controller.abort()
+  }, [])
+
+  const fundingRatio = data ? Number(data.funding_ratio) : 0
+  const shortfallEok = data ? toEok(data.shortfall_amount) : '-'
+  const dday = data ? toDday(data.additional_due_date) : null
+  const config = data ? STATUS_CONFIG[data.status] : null
+
   return (
     <div className="space-y-6">
       {/* Welcome Hero */}
@@ -53,9 +91,6 @@ export function DBOverview() {
             </h2>
             <p className="text-muted-foreground">법정 기준 대비 적립 적정성을 한눈에 점검할 수 있습니다</p>
           </div>
-          <span className="text-sm text-muted-foreground whitespace-nowrap mt-1">
-            2025년 5월 기준 · (주)한국기업
-          </span>
         </div>
       </div>
 
@@ -72,9 +107,9 @@ export function DBOverview() {
               <div className="mt-4">
                 <p className="text-sm text-muted-foreground">가입자 수</p>
                 <p className="text-3xl font-bold text-foreground mt-1">
-                  247<span className="text-lg font-normal text-muted-foreground ml-1">명</span>
+                  {data != null ? data.member_count.toLocaleString() : '-'}
+                  <span className="text-lg font-normal text-muted-foreground ml-1">명</span>
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">전체 임직원 250명 중</p>
               </div>
             </CardContent>
           </Card>
@@ -88,9 +123,9 @@ export function DBOverview() {
               <div className="mt-4">
                 <p className="text-sm text-muted-foreground">현재 적립금</p>
                 <p className="text-3xl font-bold text-foreground mt-1">
-                  42.6<span className="text-lg font-normal text-muted-foreground ml-1">억</span>
+                  {data != null ? toEok(data.funded_amount) : '-'}
+                  <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
                 </p>
-                <p className="text-xs text-emerald-600 font-medium mt-1">전월 대비 +0.8억</p>
               </div>
             </CardContent>
           </Card>
@@ -104,11 +139,8 @@ export function DBOverview() {
               <div className="mt-4">
                 <p className="text-sm text-muted-foreground">퇴직급여 추계액</p>
                 <p className="text-3xl font-bold text-foreground mt-1">
-                  51.3<span className="text-lg font-normal text-muted-foreground ml-1">억</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-0.5">
-                  전년 대비 <span className="text-emerald-600 font-medium">+3.2억</span>
-                  <ArrowUp className="w-3 h-3 text-emerald-600" />
+                  {data != null ? toEok(data.benefit_obligation) : '-'}
+                  <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
                 </p>
               </div>
             </CardContent>
@@ -119,13 +151,25 @@ export function DBOverview() {
       {/* 적립금 적정성 */}
       <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '250ms' }}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-md">
-              <AlertTriangle className="w-4 h-4 text-white" />
-            </div>
-            적립금 적정성
-            <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-100 text-amber-600">법정 기준 미달 주의</span>
-          </CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-md">
+                <AlertTriangle className="w-4 h-4 text-white" />
+              </div>
+              적립금 적정성
+              {config && (
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-lg ${config.badgeClass}`}>
+                  {config.label}
+                </span>
+              )}
+            </CardTitle>
+            {config?.showWarning && (
+              <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {config.warningText}
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="p-5 bg-white/50 rounded-2xl border border-white/50">
@@ -134,21 +178,25 @@ export function DBOverview() {
                 <p className="font-semibold text-foreground">기준책임준비금 대비 적립 비율</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   법정 최소 기준: <span className="font-semibold text-foreground">100%</span> ·
-                  현재: <span className="font-semibold text-amber-600"> {FUNDING_RATIO.toFixed(1)}%</span> ·
-                  부족액: <span className="font-semibold text-red-500"> 8.7억</span>
+                  현재: <span className={`font-semibold ${fundingRatio >= 100 ? 'text-emerald-600' : fundingRatio >= 90 ? 'text-amber-600' : 'text-red-500'}`}> {data ? fundingRatio.toFixed(1) : '-'}%</span>
+                  {data && data.shortfall_amount > 0 && (
+                    <> · 부족액: <span className="font-semibold text-red-500"> {shortfallEok}억</span></>
+                  )}
                 </p>
               </div>
-              <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-red-100 text-red-500 whitespace-nowrap">추가납입 필요</span>
+              {config && (
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-lg whitespace-nowrap ${config.badgeClass}`}>
+                  {config.label}
+                </span>
+              )}
             </div>
 
             {/* Progress bar */}
             <div className="relative h-3 bg-slate-200/70 rounded-full overflow-hidden">
               <div
-                className="absolute inset-y-0 left-0 progress-fill rounded-full transition-all duration-700"
-                style={{ width: `${FUNDING_RATIO}%` }}
+                className="h-full progress-fill rounded-full transition-all duration-700"
+                style={{ width: `${Math.min(fundingRatio, 100)}%` }}
               />
-              {/* 100% marker */}
-              <div className="absolute inset-y-0 right-0 w-0.5 bg-red-500" />
             </div>
             <div className="flex justify-between text-xs text-muted-foreground mt-2">
               <span>0%</span>
@@ -161,18 +209,26 @@ export function DBOverview() {
             {/* Summary */}
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-white/50">
               <div className="text-center">
-                <p className="text-xl font-bold text-foreground">51.3억</p>
+                <p className="text-xl font-bold text-foreground">
+                  {data ? `${toEok(data.min_reserve)}억` : '-'}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">기준책임준비금</p>
               </div>
               <div className="text-center">
-                <p className="text-xl font-bold text-foreground">42.6억</p>
+                <p className="text-xl font-bold text-foreground">
+                  {data ? `${toEok(data.funded_amount)}억` : '-'}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">현재 적립금</p>
               </div>
               <div className="text-center">
-                <p className="text-xl font-bold text-red-500">-8.7억</p>
+                <p className={`text-xl font-bold ${data && data.shortfall_amount > 0 ? 'text-red-500' : 'text-foreground'}`}>
+                  {data ? (data.shortfall_amount > 0 ? `-${shortfallEok}억` : '충족') : '-'}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                   부족액
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-500">D-47 기한</span>
+                  {data && data.shortfall_amount > 0 && dday && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-500">{dday} 기한</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -195,22 +251,22 @@ export function DBOverview() {
           <CardContent>
             {/* Stacked bar */}
             <div className="flex h-3 rounded-full overflow-hidden mb-5">
-              {portfolioItems.map((item) => (
+              {(portfolio?.portfolio_items ?? []).map((item) => (
                 <div
-                  key={item.name}
-                  style={{ width: `${item.percent}%`, backgroundColor: item.color }}
+                  key={item.category}
+                  style={{ flex: item.amount, backgroundColor: CATEGORY_COLORS[item.category] ?? '#94a3b8' }}
                   className="h-full"
                 />
               ))}
             </div>
 
             <div className="space-y-3">
-              {portfolioItems.map((item) => (
-                <div key={item.name} className="flex items-center text-sm">
-                  <span className="w-2.5 h-2.5 rounded-sm mr-2.5 shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="flex-1 text-foreground">{item.name}</span>
+              {(portfolio?.portfolio_items ?? []).map((item) => (
+                <div key={item.category} className="flex items-center text-sm">
+                  <span className="w-2.5 h-2.5 rounded-full mr-2.5 shrink-0" style={{ backgroundColor: CATEGORY_COLORS[item.category] ?? '#94a3b8' }} />
+                  <span className="flex-1 text-foreground">{item.category}</span>
                   <span className="font-semibold text-foreground w-14 text-right">{item.percent}%</span>
-                  <span className="text-muted-foreground w-16 text-right">{item.amount}</span>
+                  <span className="text-muted-foreground w-16 text-right">{toEok(item.amount)}억</span>
                 </div>
               ))}
             </div>
@@ -227,36 +283,29 @@ export function DBOverview() {
                 </div>
                 만기 도래 상품
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-muted-foreground">3건</span>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-muted-foreground">{portfolio?.maturing_products.length ?? 0}건</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2.5">
-              {maturingProducts.map((p) => (
-                <div key={p.name} className="flex items-center justify-between p-3 bg-white/50 rounded-xl border border-white/50 hover:bg-white/80 transition-all duration-300">
-                  <span className="font-semibold text-foreground text-sm">{p.name}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">
-                      {p.due} · <span className="text-foreground font-medium">{p.amount}</span>
-                    </span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${ddayToneClass[p.tone]}`}>
-                      {p.dday}
-                    </span>
+              {(portfolio?.maturing_products ?? []).map((p) => {
+                const tone = getDdayTone(p.maturity_date)
+                return (
+                  <div key={p.name + p.maturity_date} className="flex items-center justify-between p-3 bg-white/50 rounded-xl border border-white/50 hover:bg-white/80 transition-all duration-300">
+                    <span className="font-semibold text-foreground text-sm">{p.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-muted-foreground">
+                        {formatDue(p.maturity_date)} · <span className="text-foreground font-medium">{toEok(p.evaluated_amount)}억</span>
+                      </span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${ddayToneClass[tone]}`}>
+                        {toDday(p.maturity_date)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
-            <div className="mt-4 pt-4 border-t border-white/50 space-y-2.5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">전체 운용수익률 (연환산)</span>
-                <span className="font-semibold text-emerald-600">3.42%</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">원리금보장 비중</span>
-                <span className="font-semibold text-foreground">75%</span>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
