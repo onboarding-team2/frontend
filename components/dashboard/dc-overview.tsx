@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { getPensionDashboard, DcDashboard } from '@/lib/api'
 
 function toEok(amount: number): string {
-  return (amount / 100000000).toFixed(2)
+  return (amount / 1000000).toFixed(0)
 }
 
 function calcDday(dueDateStr: string | null): string {
@@ -106,7 +106,7 @@ export function DCOverview() {
               <p className="text-sm text-muted-foreground">DC형 총 적립금</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.total_balance) : '-'}
-                <span className="text-lg font-normal text-muted-foreground ml-1">억원</span>
+                <span className="text-lg font-normal text-muted-foreground ml-1">백만원</span>
               </p>
             </div>
           </CardContent>
@@ -162,7 +162,7 @@ export function DCOverview() {
               <p className="text-sm text-muted-foreground">{contributionTitle}</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.this_month_contribution) : '-'}
-                <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
+                <span className="text-lg font-normal text-muted-foreground ml-1">백만원</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 납입기한 <span className="font-semibold text-foreground">{dueLabel}</span>
