@@ -28,7 +28,7 @@ function DCSidebar() {
   const router = useRouter()
   const pathname = usePathname()
 
-  const activeTab: TabType = pathname.endsWith('/members')
+  const activeTab: TabType = pathname.includes('/members')
     ? 'members'
     : pathname.endsWith('/deadlines')
     ? 'deadlines'

@@ -70,11 +70,13 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashb
   }
 }
 
-export async function getPensionMembers(signal?: AbortSignal): Promise<Employee[]> {
-  const result = await pensionFetch('/members', signal) as Record<string, unknown>[]
+export async function getPensionMembers(signal?: AbortSignal, filter?: string | null): Promise<Employee[]> {
+  const query = filter ? `?filter=${encodeURIComponent(filter)}` : ''
+  const result = await pensionFetch(`/members${query}`, signal) as Record<string, unknown>[]
   return result.map((item) => ({
     id: item.id as number,
     name: item.name as string,
+    rrnMasked: ((item.rrnMasked ?? item.rrn_masked) as string) ?? null,
     position: (item.position as string) ?? null,
     startDate: ((item.startDate ?? item.start_date) as string) ?? null,
     joinDate: ((item.joinDate ?? item.join_date) as string) ?? null,
@@ -97,6 +99,7 @@ async function fetchMembersByPlan(plan: 'dc' | 'db', signal?: AbortSignal): Prom
   return result.map((item) => ({
     id: item.id as number,
     name: item.name as string,
+    rrnMasked: ((item.rrnMasked ?? item.rrn_masked) as string) ?? null,
     position: (item.position as string) ?? null,
     startDate: ((item.startDate ?? item.start_date) as string) ?? null,
     joinDate: ((item.joinDate ?? item.join_date) as string) ?? null,
@@ -130,6 +133,7 @@ export type EmployeeStatus = '재직' | '퇴직'
 export type Employee = {
   id: number
   name: string
+  rrnMasked: string | null
   position: string | null
   startDate: string | null
   joinDate: string | null
