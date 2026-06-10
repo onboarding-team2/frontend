@@ -3,10 +3,17 @@
 import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { TabType } from '@/lib/types'
+import { useEffect, useState } from 'react'
 
 interface SidebarProps {
   activeTab: TabType
   setActiveTab: (tab: TabType) => void
+}
+
+interface CompanyInfo {
+  companyName: string
+  businessNumber: string
+  planType : string
 }
 
 const menuItems = [
@@ -19,6 +26,41 @@ const menuItems = [
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const router = useRouter()
 
+  // 기업 정보
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          router.push('/')
+          return
+        }
+
+        const response = await fetch('http://localhost:8080/company/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setCompanyInfo(data)
+        } else {
+          console.error('기업 정보를 불러오는 데 실패했습니다.')
+        }
+      } catch (error) {
+        console.error('API 호출 에러:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCompanyInfo()
+  }, [router])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -28,6 +70,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
     router.push('/')
   }
+  
 
   const deleteCookie = (name: string) => {
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
@@ -87,21 +130,44 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       {/* Company Info Card */}
       <div className="p-4">
-        <div className="glass rounded-2xl p-4 bg-gradient-to-br from-primary/10 to-accent/5 hover-lift">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold text-foreground text-sm">주식회사 테스트기업</p>
-              <p className="text-xs text-muted-foreground">123-45-67890</p>
+        {loading ? (
+          <div className="glass rounded-2xl p-4 animate-pulse bg-white/20 h-28" />
+        ) : companyInfo ? (
+          <div className="glass rounded-2xl p-4 bg-gradient-to-br from-primary/10 to-accent/5 hover-lift">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
+
+              <div className="flex flex-col gap-0.5 flex-grow min-w-0">
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <p className="font-semibold text-foreground text-sm truncate flex-shrink min-w-0">
+                    {companyInfo.companyName}
+                  </p>
+                  
+                  <div className="flex-shrink-0">
+                    {companyInfo.planType === 'DC' && (
+                      <span className="px-2 py-0.5 text-xs rounded-md bg-primary/15 text-primary font-medium transition-colors hover:bg-primary/25 whitespace-nowrap">
+                        DC형
+                      </span>
+                    )}
+                    {companyInfo.planType === 'DB' && (
+                      <span className="px-2 py-0.5 text-xs rounded-md bg-accent/15 text-accent font-medium transition-colors hover:bg-accent/25 whitespace-nowrap">
+                        DB형
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <p className="text-xs text-muted-foreground">{companyInfo.businessNumber}</p>
+              </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <span className="px-2 py-1 text-xs rounded-md bg-primary/15 text-primary font-medium transition-colors hover:bg-primary/25">DC형</span>
-            <span className="px-2 py-1 text-xs rounded-md bg-accent/15 text-accent font-medium transition-colors hover:bg-accent/25">DB형</span>
+        ) : (
+          <div className="glass rounded-2xl p-4 text-center text-xs text-muted-foreground">
+            기업 정보 없음
           </div>
-        </div>
+        )}
       </div>
 
       {/* Logout */}
