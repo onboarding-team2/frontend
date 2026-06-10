@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  Building2,
   Users,
   Wallet,
   TrendingUp,
@@ -11,8 +10,9 @@ import {
   CalendarClock,
   PieChart as PieChartIcon,
 } from 'lucide-react'
-import { getDbDashboard, DbDashboard, getDbPortfolio, DbPortfolio } from '@/lib/api'
+import { getDbDashboard, DbDashboard, getDbPortfolio, DbPortfolio, getCompanyProfile, CompanyProfile } from '@/lib/api'
 import { STATUS_CONFIG } from '@/lib/statusConfig'
+import { WelcomeBanner } from './welcome-banner'
 
 const CATEGORY_COLORS: Record<string, string> = {
   '정기예금': '#2563eb',
@@ -59,11 +59,13 @@ function toDday(dateStr: string | null): string | null {
 export function DBOverview() {
   const [data, setData] = useState<DbDashboard | null>(null)
   const [portfolio, setPortfolio] = useState<DbPortfolio | null>(null)
+  const [company, setCompany] = useState<CompanyProfile | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
     getDbDashboard(controller.signal).then(setData).catch(() => {})
     getDbPortfolio(controller.signal).then(setPortfolio).catch(() => {})
+    getCompanyProfile(controller.signal).then(setCompany).catch(() => {})
     return () => controller.abort()
   }, [])
 
@@ -75,31 +77,14 @@ export function DBOverview() {
   return (
     <div className="space-y-6">
       {/* Welcome Hero */}
-      <div className="glass rounded-2xl p-8 relative overflow-hidden animate-scale-in">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-accent/20 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="relative z-10 flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-accent/20">
-                <Building2 className="w-4 h-4 text-primary" />
-              </div>
-              <span className="text-sm text-primary font-medium">DB형 퇴직연금 관리 현황</span>
-            </div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">
-              <span className="gradient-text">기금 적립</span> 현황을 확인하세요
-            </h2>
-            <p className="text-muted-foreground">법정 기준 대비 적립 적정성을 한눈에 점검할 수 있습니다</p>
-          </div>
-        </div>
-      </div>
+      <WelcomeBanner planType="DB" companyName={company?.companyName} />
 
       {/* 주요 현황 Stats */}
       <div>
         <p className="text-sm font-semibold text-muted-foreground mb-3 px-1">주요 현황</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* 가입자 수 */}
-          <Card className="glass border-0 card-interactive bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up" style={{ animationDelay: '0ms' }}>
+          <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up">
             <CardContent className="p-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
                 <Users className="w-6 h-6 text-white" />
@@ -115,7 +100,7 @@ export function DBOverview() {
           </Card>
 
           {/* 현재 적립금 */}
-          <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
             <CardContent className="p-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
                 <Wallet className="w-6 h-6 text-white" />
@@ -131,7 +116,7 @@ export function DBOverview() {
           </Card>
 
           {/* 퇴직급여 추계액 */}
-          <Card className="glass border-0 card-interactive bg-gradient-to-br from-violet-500/15 to-violet-500/5 animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-violet-500/15 to-violet-500/5 animate-slide-up">
             <CardContent className="p-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
                 <TrendingUp className="w-6 h-6 text-white" />
@@ -149,7 +134,7 @@ export function DBOverview() {
       </div>
 
       {/* 적립금 적정성 */}
-      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '250ms' }}>
+      <Card className="glass border-0 animate-slide-up">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -239,7 +224,7 @@ export function DBOverview() {
       {/* 하단 2단 구성 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 운용상품 포트폴리오 */}
-        <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '300ms' }}>
+        <Card className="glass border-0 animate-slide-up">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
@@ -274,7 +259,7 @@ export function DBOverview() {
         </Card>
 
         {/* 만기 도래 상품 */}
-        <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '350ms' }}>
+        <Card className="glass border-0 animate-slide-up">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center justify-between">
               <div className="flex items-center gap-2">
