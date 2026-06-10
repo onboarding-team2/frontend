@@ -2,7 +2,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 
 export const DEMO_COMPANY_ID = 'C005'
 
-function authHeaders(): HeadersInit {
+export function authHeaders(): HeadersInit {
   if (typeof window === 'undefined') return {}
   const cookieRaw = document.cookie.match(/(?:^|;\s*)token=([^;]*)/)?.[1]
   const token =
