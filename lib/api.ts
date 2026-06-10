@@ -31,6 +31,7 @@ export type DcDashboard = {
   irp_not_opened: number
   this_month_contribution: number
   contribution_due_date: string | null
+  payment_cycle: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null
 }
 
 export type ExpectedRetiree = {
@@ -67,6 +68,7 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashb
     this_month_contribution: (r.this_month_contribution ?? r.thisMonthContribution ?? 0) as number,
     contribution_due_date: (r.contribution_due_date ?? r.contributionDueDate ?? null) as string | null,
     irp_not_opened: (r.irp_account_not_opened ?? r.irpAccountNotOpened ?? 0) as number,
+    payment_cycle: (r.payment_cycle ?? null) as 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null,
   }
 }
 

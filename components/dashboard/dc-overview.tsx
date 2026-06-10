@@ -68,6 +68,12 @@ export function DCOverview() {
     ? data.contribution_due_date.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$2/$3')
     : '-'
 
+  const contributionTitle =
+    data?.payment_cycle === 'MONTHLY' ? '이번 달 납입 부담금': 
+    data?.payment_cycle === 'QUARTERLY' ? '이번 분기 납입 부담금': 
+    data?.payment_cycle === 'YEARLY' ? '올해 납입 부담금': 
+    '납입 부담금'
+
   return (
     <div className="space-y-6">
       {/* Welcome Hero */}
@@ -153,7 +159,7 @@ export function DCOverview() {
               )}
             </div>
             <div className="mt-4">
-              <p className="text-sm text-muted-foreground">이번 달 납입 부담금</p>
+              <p className="text-sm text-muted-foreground">{contributionTitle}</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.this_month_contribution) : '-'}
                 <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
