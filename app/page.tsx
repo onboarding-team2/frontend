@@ -77,9 +77,9 @@ export default function LoginPage() {
     <div className="h-screen bg-background relative overflow-hidden">
       {/* 배경 글로우 — develop 브랜치 반영 */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 -left-32 w-[600px] h-[600px] bg-sky-200/35 rounded-full blur-[140px]" />
-        <div className="absolute bottom-1/4 -right-32 w-[600px] h-[600px] bg-sky-100/40 rounded-full blur-[140px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-white/50 rounded-full blur-[160px]" />
+        <div className="absolute top-1/4 -left-32 w-[600px] h-[600px] bg-primary/30 rounded-full blur-[140px]" />
+        <div className="absolute bottom-1/4 -right-32 w-[600px] h-[600px] bg-accent/30 rounded-full blur-[140px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-sky-300/20 rounded-full blur-[160px]" />
       </div>
 
       {/* 3D IBK 배경 오브젝트 */}
@@ -205,7 +205,7 @@ export default function LoginPage() {
 
                   <Button
                     type="submit"
-                    className="group w-full h-11 text-sm font-semibold bg-gradient-to-r from-sky-300 to-blue-300 hover:opacity-95 rounded-xl transition-all shadow-lg shadow-sky-200/50 gap-2"
+                    className="group w-full h-11 text-sm font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-95 rounded-xl transition-all shadow-lg shadow-primary/30 gap-2"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -224,12 +224,9 @@ export default function LoginPage() {
                     )}
                   </Button>
 
-                  <div className="flex items-center justify-between text-xs pt-0.5">
+                  <div className="flex items-center text-xs pt-0.5">
                     <button type="button" className="text-primary hover:text-primary/80 transition-colors">
                       비밀번호 찾기
-                    </button>
-                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
-                      인증서 로그인
                     </button>
                   </div>
                 </form>

@@ -389,7 +389,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             <div>
               <h3 className="font-semibold text-foreground flex items-center gap-2">
                 AI 상담사
-                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                <Sparkles className="w-4 h-4 text-primary" />
               </h3>
               <p className="text-xs text-muted-foreground">
                 {isTyping ? '입력 중...' : '항상 대기 중'}
