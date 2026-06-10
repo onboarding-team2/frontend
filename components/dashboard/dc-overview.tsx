@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { getPensionDashboard, DcDashboard } from '@/lib/api'
 
 function toEok(amount: number): string {
-  return (amount / 100000000).toFixed(2)
+  return (amount / 1000000).toFixed(0)
 }
 
 function calcDday(dueDateStr: string | null): string {
@@ -40,7 +40,7 @@ export function DCOverview() {
       chartColor: '#f59e0b',
       incompleteLabel: '미선정',
       completeLabel: '선정 완료',
-      filterKey: 'default-unset',
+      filterKey: 'default=미선정',
     },
     {
       title: 'IRP 개설 미완료',
@@ -50,7 +50,7 @@ export function DCOverview() {
       chartColor: '#f43f5e',
       incompleteLabel: '미완료',
       completeLabel: '개설 완료',
-      filterKey: 'irp-none',
+      filterKey: 'irp=미보유',
     },
   ]
 
@@ -67,6 +67,12 @@ export function DCOverview() {
   const dueLabel = data?.contribution_due_date
     ? data.contribution_due_date.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$2/$3')
     : '-'
+
+  const contributionTitle =
+    data?.payment_cycle === 'MONTHLY' ? '이번 달 납입 부담금': 
+    data?.payment_cycle === 'QUARTERLY' ? '이번 분기 납입 부담금': 
+    data?.payment_cycle === 'YEARLY' ? '올해 납입 부담금': 
+    '납입 부담금'
 
   return (
     <div className="space-y-6">
@@ -100,7 +106,7 @@ export function DCOverview() {
               <p className="text-sm text-muted-foreground">DC형 총 적립금</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.total_balance) : '-'}
-                <span className="text-lg font-normal text-muted-foreground ml-1">억원</span>
+                <span className="text-lg font-normal text-muted-foreground ml-1">백만원</span>
               </p>
             </div>
           </CardContent>
@@ -153,10 +159,10 @@ export function DCOverview() {
               )}
             </div>
             <div className="mt-4">
-              <p className="text-sm text-muted-foreground">이번 달 납입 부담금</p>
+              <p className="text-sm text-muted-foreground">{contributionTitle}</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.this_month_contribution) : '-'}
-                <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
+                <span className="text-lg font-normal text-muted-foreground ml-1">백만원</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 납입기한 <span className="font-semibold text-foreground">{dueLabel}</span>
@@ -257,7 +263,7 @@ export function DCOverview() {
 
                   <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/50">
                     <button
-                      onClick={() => router.push(`/pension/dc/members?filter=${item.filterKey}`)}
+                      onClick={() => router.push(`/pension/dc/members?${item.filterKey}`)}
                       className="flex items-center gap-1 text-sm text-primary font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:gap-2 hover:shadow-sm transition-all"
                     >
                       목록 전체 보기
