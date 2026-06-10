@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   // 쿠키에서 토큰 확인
   const token = request.cookies.get('token')?.value
   const { pathname } = request.nextUrl
-
+  const planType = request.cookies.get('planType')?.value?.toLowerCase() || 'dc'
 
   if (pathname === '/') {
     if (token) {
@@ -18,6 +18,14 @@ export function middleware(request: NextRequest) {
   // 토큰이 없다면 로그인 화면으로 리다이렉트
   if (!token) {
     return NextResponse.redirect(new URL('/', request.url))
+  }
+  
+  if (pathname.startsWith('/pension/db/') && planType === 'dc') {
+    return NextResponse.redirect(new URL('/pension/dc/dashboard', request.url))
+  }
+
+  if (pathname.startsWith('/pension/dc/') && planType === 'db') {
+    return NextResponse.redirect(new URL('/pension/db/dashboard', request.url))
   }
 
   return NextResponse.next()
