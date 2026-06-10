@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { authHeaders } from '@/lib/api'
 import {
   X, Send, Bot, User, Sparkles, FileText, Download,
   ChevronDown, Minimize2, Maximize2, Expand, Shrink,
@@ -101,7 +102,7 @@ function normalizeIntent(value: unknown): ChatIntent {
 function buildChatHistory(messages: Message[]): ChatHistoryPayload[] {
   return messages
     .filter((message) => message.id !== '1')
-    .map((message) => ({
+    .map((message): ChatHistoryPayload => ({
       role: message.role === 'bot' ? 'assistant' : 'user',
       content: message.content.trim(),
     }))
@@ -285,7 +286,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     try {
       const response = await fetch(CHAT_STREAM_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ message: userMessage, company_id: 'poc', history }),
       })
 
