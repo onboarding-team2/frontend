@@ -72,10 +72,8 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashb
   }
 }
 
-export async function getPensionMembers(signal?: AbortSignal, filter?: string | null): Promise<Employee[]> {
-  const query = filter ? `?filter=${encodeURIComponent(filter)}` : ''
-  const result = await pensionFetch(`/members${query}`, signal) as Record<string, unknown>[]
-  return result.map((item) => ({
+function mapMember(item: Record<string, unknown>): Employee {
+  return {
     id: item.id as number,
     name: item.name as string,
     rrnMasked: ((item.rrnMasked ?? item.rrn_masked) as string) ?? null,
@@ -87,38 +85,73 @@ export async function getPensionMembers(signal?: AbortSignal, filter?: string | 
     balance: (item.balance as number) ?? null,
     contributionPaid: (item.contributionPaid as boolean) ?? null,
     status: (item.status as EmployeeStatus) ?? null,
-  }))
+  }
 }
 
-async function fetchMembersByPlan(plan: 'dc' | 'db', signal?: AbortSignal): Promise<Employee[]> {
-  const res = await fetch(`${API_BASE}/pension/${plan}/members`, {
+export type MemberQuery = {
+  name?: string
+  status?: string[]
+  type?: string[]
+  irp?: string[]
+  default?: string[]
+  contribution?: string[]
+  page?: number
+  size?: number
+}
+
+export type MemberPage = {
+  totalCount: number
+  page: number
+  size: number
+  totalPages: number
+  members: Employee[]
+}
+
+function buildMemberQuery(q: MemberQuery): string {
+  const p = new URLSearchParams()
+  if (q.name) p.set('name', q.name)
+  ;(q.status ?? []).forEach(v => p.append('status', v))
+  ;(q.type ?? []).forEach(v => p.append('type', v))
+  ;(q.irp ?? []).forEach(v => p.append('irp', v))
+  ;(q.default ?? []).forEach(v => p.append('default', v))
+  ;(q.contribution ?? []).forEach(v => p.append('contribution', v))
+  p.set('page', String(q.page ?? 0))
+  p.set('size', String(q.size ?? 20))
+  return p.toString()
+}
+
+async function fetchMemberPage(plan: 'dc' | 'db', q: MemberQuery, signal?: AbortSignal): Promise<MemberPage> {
+  const res = await fetch(`${API_BASE}/pension/${plan}/members?${buildMemberQuery(q)}`, {
     headers: authHeaders(),
     cache: 'no-store',
     signal,
   })
   if (!res.ok) throw new Error(await readError(res, '가입자 목록 조회 실패'))
-  const result = await res.json() as Record<string, unknown>[]
-  return result.map((item) => ({
-    id: item.id as number,
-    name: item.name as string,
-    rrnMasked: ((item.rrnMasked ?? item.rrn_masked) as string) ?? null,
-    position: (item.position as string) ?? null,
-    startDate: ((item.startDate ?? item.start_date) as string) ?? null,
-    joinDate: ((item.joinDate ?? item.join_date) as string) ?? null,
-    hasIrpAccount: ((item.hasIrpAccount ?? item.has_irp_account) as string) ?? null,
-    defaultOption: ((item.defaultOption ?? item.default_option) as string) ?? null,
-    balance: (item.balance as number) ?? null,
-    contributionPaid: (item.contributionPaid as boolean) ?? null,
-    status: (item.status as EmployeeStatus) ?? null,
-  }))
+  const r = await res.json() as Record<string, unknown>
+  return {
+    totalCount: (r.totalCount as number) ?? 0,
+    page: (r.page as number) ?? 0,
+    size: (r.size as number) ?? 0,
+    totalPages: (r.totalPages as number) ?? 0,
+    members: ((r.members ?? []) as Record<string, unknown>[]).map(mapMember),
+  }
 }
 
+export function getDcMemberPage(q: MemberQuery, signal?: AbortSignal): Promise<MemberPage> {
+  return fetchMemberPage('dc', q, signal)
+}
+
+export function getDbMemberPage(q: MemberQuery, signal?: AbortSignal): Promise<MemberPage> {
+  return fetchMemberPage('db', q, signal)
+}
+
+// 전체 목록(배열) — 마감 알림 등에서 사용
 export async function getDbMembers(signal?: AbortSignal): Promise<Employee[]> {
-  return fetchMembersByPlan('db', signal)
+  return (await fetchMemberPage('db', { size: 100000 }, signal)).members
 }
 
 export async function getDcMembers(signal?: AbortSignal): Promise<Employee[]> {
-  return fetchMembersByPlan('dc', signal)
+  return (await fetchMemberPage('dc', { size: 100000 }, signal)).members
 }
 
 export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {

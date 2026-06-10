@@ -40,7 +40,7 @@ export function DCOverview() {
       chartColor: '#f59e0b',
       incompleteLabel: '미선정',
       completeLabel: '선정 완료',
-      filterKey: 'default-unset',
+      filterKey: 'default=미선정',
     },
     {
       title: 'IRP 개설 미완료',
@@ -50,7 +50,7 @@ export function DCOverview() {
       chartColor: '#f43f5e',
       incompleteLabel: '미완료',
       completeLabel: '개설 완료',
-      filterKey: 'irp-none',
+      filterKey: 'irp=미보유',
     },
   ]
 
@@ -263,7 +263,7 @@ export function DCOverview() {
 
                   <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/50">
                     <button
-                      onClick={() => router.push(`/pension/dc/members?filter=${item.filterKey}`)}
+                      onClick={() => router.push(`/pension/dc/members?${item.filterKey}`)}
                       className="flex items-center gap-1 text-sm text-primary font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:gap-2 hover:shadow-sm transition-all"
                     >
                       목록 전체 보기
