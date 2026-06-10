@@ -4,101 +4,74 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Search, Plus, Edit2, Trash2, Filter, Download, ChevronLeft, ChevronRight, Users } from 'lucide-react'
-import { getPensionMembers, getDcMemberDetail, EmployeeDetail } from '@/lib/api'
-import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
+import { Search, Filter, Users, X, Check } from 'lucide-react'
+import { getPensionMembers } from '@/lib/api'
+
+type FilterKey = 'status' | 'type' | 'irp' | 'default' | 'contribution'
 
 interface Member {
   id: string
   name: string
+  rrnMasked: string
+  position: string
   joinDate: string
-  irpAccount: '개설완료' | '미개설'
-  defaultOption: string
-  balance: string
+  status: '재직' | '퇴직'
+  irp: '보유' | '미보유'
+  defaultOption: '선정' | '미선정'
+  contribution: '납입완료' | '미납'
 }
+
+const FILTER_GROUPS: {
+  key: FilterKey
+  label: string
+  options: { value: string; label: string }[]
+}[] = [
+  { key: 'status', label: '재직여부', options: [{ value: '재직', label: '재직중' }, { value: '퇴직', label: '퇴직' }] },
+  { key: 'type', label: '구분', options: [{ value: '사원', label: '사원' }, { value: '임원', label: '임원' }] },
+  { key: 'irp', label: 'IRP계좌', options: [{ value: '보유', label: '보유' }, { value: '미보유', label: '미보유' }] },
+  { key: 'default', label: '디폴트옵션', options: [{ value: '선정', label: '선정' }, { value: '미선정', label: '미선정' }] },
+  { key: 'contribution', label: '부담금 납입여부', options: [{ value: '납입완료', label: '납입완료' }, { value: '미납', label: '미납' }] },
+]
+
+const EMPTY_FILTERS: Record<FilterKey, string[]> = { status: [], type: [], irp: [], default: [], contribution: [] }
 
 function toMember(item: Awaited<ReturnType<typeof getPensionMembers>>[0]): Member {
   return {
     id: String(item.id),
     name: item.name,
+    rrnMasked: item.rrnMasked ?? '-',
+    position: item.position ?? '-',
     joinDate: item.joinDate ?? '-',
-    irpAccount: item.hasIrpAccount === 'Y' ? '개설완료' : '미개설',
-    defaultOption:
-      item.defaultOption === 'Y' ? '설정완료' :
-      item.defaultOption === 'N' ? '미설정' : '-',
-    balance: item.balance != null ? item.balance.toLocaleString() : '-',
+    status: item.status === '퇴직' ? '퇴직' : '재직',
+    irp: item.hasIrpAccount === 'Y' ? '보유' : '미보유',
+    defaultOption: item.defaultOption === 'Y' ? '선정' : '미선정',
+    contribution: item.contributionPaid ? '납입완료' : '미납',
   }
 }
 
-function toSubscriberDetail(detail: EmployeeDetail): SubscriberDetail {
-  return {
-    id: String(detail.id),
-    employeeId: String(detail.id),
-    name: detail.name,
-    company: detail.company?.companyName ?? '',
-    accountType: (detail.company?.planType as 'DC' | 'DB' | 'IRP') ?? 'DC',
-    joinDate: detail.retirement?.joinDate ?? '',
-    startDate: detail.retirement?.startDate ?? undefined,
-    terminationDate: detail.retirement?.terminationDate ?? undefined,
-    effectiveDate: detail.retirement?.effectiveDate ?? undefined,
-    defaultOption: detail.retirement?.defaultOption as 'Y' | 'N' | null ?? null,
-    employeeType: detail.retirement?.employeeType ?? undefined,
-    balance: (detail.retirement?.balance as number) ?? 0,
+function memberValue(m: Member, key: FilterKey): string {
+  switch (key) {
+    case 'status': return m.status
+    case 'type': return m.position
+    case 'irp': return m.irp
+    case 'default': return m.defaultOption
+    case 'contribution': return m.contribution
   }
+}
+
+function toggle(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter(v => v !== value) : [...list, value]
 }
 
 export function MemberManagement() {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterIrp, setFilterIrp] = useState<'all' | '개설완료' | '미개설'>('all')
-  const [filterDefault, setFilterDefault] = useState<'all' | 'set' | 'unset'>('all')
 
-  const [isEditOpen, setIsEditOpen] = useState(false)
-  const [editingMember, setEditingMember] = useState<Member | null>(null)
-
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [deletingMember, setDeletingMember] = useState<Member | null>(null)
-
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
-  const [newMember, setNewMember] = useState<Omit<Member, 'id'>>({
-    name: '',
-    joinDate: '',
-    irpAccount: '미개설',
-    defaultOption: '미설정',
-    balance: '',
-  })
-  const [regEmployeeType, setRegEmployeeType] = useState<'EMPLOYEE' | 'EXECUTIVE'>('EMPLOYEE')
-  const [regRrn, setRegRrn] = useState('')
-
-  const [subscriberDetail, setSubscriberDetail] = useState<SubscriberDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  // 적용된 필터 / 팝업 내 임시 선택
+  const [filters, setFilters] = useState<Record<FilterKey, string[]>>(EMPTY_FILTERS)
+  const [pending, setPending] = useState<Record<FilterKey, string[]>>(EMPTY_FILTERS)
+  const [filterOpen, setFilterOpen] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -109,101 +82,45 @@ export function MemberManagement() {
     return () => controller.abort()
   }, [])
 
-  const formatRrn = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 13)
-    if (digits.length <= 6) return digits
-    return `${digits.slice(0, 6)}-${digits.slice(6)}`
+  const openFilter = () => {
+    setPending(filters)
+    setFilterOpen(true)
   }
-
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch = member.name.includes(searchTerm)
-    const matchesIrp = filterIrp === 'all' || member.irpAccount === filterIrp
-    const matchesDefault =
-      filterDefault === 'all' ||
-      (filterDefault === 'set' && member.defaultOption === '설정완료') ||
-      (filterDefault === 'unset' && member.defaultOption === '미설정')
-    return matchesSearch && matchesIrp && matchesDefault
-  })
-
-  const handleNameClick = async (member: Member) => {
-    setDetailLoading(true)
-    try {
-      const detail = await getDcMemberDetail(Number(member.id))
-      setSubscriberDetail(toSubscriberDetail(detail))
-    } catch {
-      // 상세 조회 실패 시 기본 정보로 모달 표시
-      setSubscriberDetail({
-        id: member.id,
-        employeeId: member.id,
-        name: member.name,
-        company: '',
-        accountType: 'DC',
-        joinDate: member.joinDate !== '-' ? member.joinDate : '',
-        defaultOption: member.defaultOption === '설정완료' ? 'Y' : member.defaultOption === '미설정' ? 'N' : null,
-        balance: 0,
-      })
-    } finally {
-      setDetailLoading(false)
-    }
+  const applyFilter = () => {
+    setFilters(pending)
+    setFilterOpen(false)
   }
+  const togglePending = (key: FilterKey, value: string) =>
+    setPending(prev => ({ ...prev, [key]: toggle(prev[key], value) }))
+  const removeChip = (key: FilterKey, value: string) =>
+    setFilters(prev => ({ ...prev, [key]: prev[key].filter(v => v !== value) }))
 
-  const handleEdit = (member: Member) => {
-    setEditingMember({ ...member })
-    setIsEditOpen(true)
-  }
+  const activeCount = FILTER_GROUPS.reduce((sum, g) => sum + filters[g.key].length, 0)
+  const labelOf = (key: FilterKey, value: string) =>
+    FILTER_GROUPS.find(g => g.key === key)?.options.find(o => o.value === value)?.label ?? value
 
-  const handleEditSave = () => {
-    if (editingMember) {
-      setMembers(prev =>
-        prev.map(m => m.id === editingMember.id ? editingMember : m)
-      )
-      setIsEditOpen(false)
-      setEditingMember(null)
-    }
-  }
-
-  const handleDelete = (member: Member) => {
-    setDeletingMember(member)
-    setIsDeleteOpen(true)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (deletingMember) {
-      setMembers(prev => prev.filter(m => m.id !== deletingMember.id))
-      setIsDeleteOpen(false)
-      setDeletingMember(null)
-    }
-  }
-
-  const handleRegisterSave = () => {
-    if (!newMember.name || !newMember.joinDate) return
-    setMembers(prev => [...prev, { ...newMember, id: String(Date.now()) }])
-    setIsRegisterOpen(false)
-    setNewMember({ name: '', joinDate: '', irpAccount: '미개설', defaultOption: '미설정', balance: '' })
-  }
+  // 검색 + 필터 + 이름 가나다순 정렬
+  const filteredMembers = members
+    .filter((m) => m.name.includes(searchTerm))
+    .filter((m) => FILTER_GROUPS.every(g => filters[g.key].length === 0 || filters[g.key].includes(memberValue(m, g.key))))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between animate-slide-up">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105">
-            <Users className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">가입자 관리</h2>
-            <p className="text-muted-foreground">퇴직연금 가입자 정보를 관리합니다</p>
-          </div>
+      {/* Header */}
+      <div className="flex items-center gap-3 animate-slide-up">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105">
+          <Users className="w-6 h-6 text-white" />
         </div>
-        <Button onClick={() => setIsRegisterOpen(true)} className="btn-hover gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
-          <Plus className="w-4 h-4" />
-          가입자 등록
-        </Button>
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">가입자 관리</h2>
+          <p className="text-muted-foreground">퇴직연금 가입자 정보를 관리합니다</p>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* Search + Filter */}
       <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '100ms' }}>
-        <CardContent className="p-4 space-y-4">
-          {/* 검색 + 필터/내보내기 */}
+        <CardContent className="p-4 space-y-3">
           <div className="flex gap-3">
             <div className="flex-1 relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -215,65 +132,91 @@ export function MemberManagement() {
                 className="pl-11 h-11 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
               />
             </div>
-            <Button variant="outline" className="gap-2 border-white/50 bg-white/30 hover:bg-white/60 transition-all">
-              <Filter className="w-4 h-4" />
-              필터
-            </Button>
-            <Button variant="outline" className="gap-2 border-white/50 bg-white/30 hover:bg-white/60 transition-all">
-              <Download className="w-4 h-4" />
-              내보내기
-            </Button>
-          </div>
 
-          {/* IRP계좌 필터 행 */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground w-20 shrink-0">IRP 계좌</span>
-            <div className="flex items-center gap-2">
-              {([
-                { value: 'all', label: '전체', count: members.length },
-                { value: '개설완료', label: '개설완료', count: members.filter(m => m.irpAccount === '개설완료').length },
-                { value: '미개설', label: '미개설', count: members.filter(m => m.irpAccount === '미개설').length },
-              ] as const).map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => setFilterIrp(item.value)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-                    filterIrp === item.value
-                      ? 'bg-primary text-white font-semibold shadow-sm'
-                      : 'bg-white/50 text-muted-foreground hover:bg-white/80'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  <span className={`text-xs font-bold ${filterIrp === item.value ? 'text-white/90' : 'text-foreground'}`}>{item.count}</span>
-                </button>
-              ))}
+            {/* 필터 버튼 + 팝업 */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => (filterOpen ? setFilterOpen(false) : openFilter())}
+                className={`gap-2 h-11 border-white/50 transition-all ${
+                  activeCount > 0 ? 'bg-primary/10 text-primary border-primary/30' : 'bg-white/30 hover:bg-white/60'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                필터
+                {activeCount > 0 && (
+                  <span className="ml-0.5 flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-primary text-white text-xs font-bold">
+                    {activeCount}
+                  </span>
+                )}
+              </Button>
+
+              {filterOpen && (
+                <>
+                  {/* 바깥 클릭 시 닫기 */}
+                  <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-72 z-50 rounded-2xl border border-white/40 bg-white/90 backdrop-blur-xl shadow-xl p-4 space-y-4 animate-slide-up">
+                    {FILTER_GROUPS.map((group) => (
+                      <div key={group.key} className="space-y-2">
+                        <p className="text-sm font-semibold text-foreground">{group.label}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {group.options.map((opt) => {
+                            const selected = pending[group.key].includes(opt.value)
+                            return (
+                              <button
+                                key={opt.value}
+                                onClick={() => togglePending(group.key, opt.value)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                                  selected ? 'bg-primary text-white font-semibold shadow-sm' : 'bg-black/5 text-muted-foreground hover:bg-black/10'
+                                }`}
+                              >
+                                {selected && <Check className="w-3.5 h-3.5" />}
+                                {opt.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        onClick={() => setPending(EMPTY_FILTERS)}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        초기화
+                      </button>
+                      <Button onClick={applyFilter} size="sm" className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+                        완료
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* 디폴트옵션 필터 행 */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground w-20 shrink-0">디폴트옵션</span>
-            <div className="flex items-center gap-2">
-              {([
-                { value: 'all', label: '전체', count: members.length },
-                { value: 'set', label: '설정 완료', count: members.filter(m => m.defaultOption === '설정완료').length },
-                { value: 'unset', label: '미설정', count: members.filter(m => m.defaultOption === '미설정').length },
-              ] as const).map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => setFilterDefault(item.value)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-                    filterDefault === item.value
-                      ? 'bg-primary text-white font-semibold shadow-sm'
-                      : 'bg-white/50 text-muted-foreground hover:bg-white/80'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  <span className={`text-xs font-bold ${filterDefault === item.value ? 'text-white/90' : 'text-foreground'}`}>{item.count}</span>
-                </button>
-              ))}
+          {/* 적용된 필터 칩 */}
+          {activeCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {FILTER_GROUPS.flatMap((group) =>
+                filters[group.key].map((value) => (
+                  <span key={`${group.key}-${value}`} className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                    {labelOf(group.key, value)}
+                    <button onClick={() => removeChip(group.key, value)} className="rounded-full hover:bg-primary/20 p-0.5 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))
+              )}
+              <button
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors ml-1"
+              >
+                전체 해제
+              </button>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -287,29 +230,28 @@ export function MemberManagement() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+        <CardContent className="px-6 pb-6 pt-2">
+          <div className="overflow-x-auto rounded-xl border border-white/40">
             <table className="w-full">
               <thead>
-                <tr className="bg-white/30">
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">이름</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">가입일</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">IRP계좌</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">디폴트옵션</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">적립금</th>
-                  <th className="text-center p-4 text-sm font-medium text-muted-foreground">관리</th>
+                <tr className="bg-white/40">
+                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">이름</th>
+                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">생년월일</th>
+                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">구분</th>
+                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">가입일</th>
+                  <th className="text-center px-6 py-4 text-sm font-medium text-muted-foreground">재직여부</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
                       데이터를 불러오는 중...
                     </td>
                   </tr>
                 ) : filteredMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
                       가입자가 없습니다.
                     </td>
                   </tr>
@@ -317,62 +259,28 @@ export function MemberManagement() {
                   filteredMembers.map((member, idx) => (
                     <tr
                       key={member.id}
-                      className="border-b border-white/20 hover:bg-white/40 transition-all duration-300 animate-slide-up"
+                      className="border-b border-white/20 cursor-pointer hover:bg-primary/10 transition-colors duration-200 animate-slide-up"
                       style={{ animationDelay: `${(idx + 3) * 50}ms` }}
                     >
-                      <td className="p-4">
-                        <button
-                          onClick={() => handleNameClick(member)}
-                          disabled={detailLoading}
-                          className="flex items-center gap-3 hover:opacity-70 transition-opacity text-left disabled:opacity-50"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                             <span className="text-xs font-semibold text-primary">{member.name.charAt(0)}</span>
                           </div>
-                          <span className="font-medium text-foreground underline-offset-2 hover:underline">{member.name}</span>
-                        </button>
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">{member.joinDate}</td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-300 hover:scale-105 ${
-                          member.irpAccount === '개설완료'
-                            ? 'bg-emerald-100 text-emerald-600'
-                            : 'bg-red-100 text-red-500'
-                        }`}>
-                          {member.irpAccount}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {member.defaultOption === '미설정' ? (
-                          <span className="px-3 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-500 transition-all duration-300 hover:scale-105">
-                            미설정
-                          </span>
-                        ) : member.defaultOption === '설정완료' ? (
-                          <span className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-600 transition-all duration-300 hover:scale-105">
-                            설정완료
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-sm text-right font-medium text-foreground">
-                        {member.balance !== '-' ? `${member.balance}원` : '-'}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => handleEdit(member)}
-                            className="p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 hover:scale-110 active:scale-95"
-                          >
-                            <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(member)}
-                            className="p-2 rounded-lg hover:bg-red-100 transition-all duration-300 hover:scale-110 active:scale-95"
-                          >
-                            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                          </button>
+                          <span className="font-medium text-foreground">{member.name}</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{member.rrnMasked}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{member.position}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{member.joinDate}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                          member.status === '재직'
+                            ? 'bg-emerald-100 text-emerald-600'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {member.status}
+                        </span>
                       </td>
                     </tr>
                   ))
@@ -380,256 +288,8 @@ export function MemberManagement() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between p-4 border-t border-white/30">
-            <span className="text-sm text-muted-foreground">1-{filteredMembers.length} / 전체 {filteredMembers.length}명</span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled className="border-white/50 bg-white/30 transition-all duration-300">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button size="sm" className="bg-gradient-to-r from-primary to-accent text-white border-0 shadow-md">
-                1
-              </Button>
-              <Button variant="outline" size="sm" disabled className="border-white/50 bg-white/30 transition-all duration-300">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
-
-      {/* Edit Member Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[500px] glass-strong border-white/30">
-          <DialogHeader>
-            <DialogTitle>가입자 정보 수정</DialogTitle>
-            <DialogDescription>
-              가입자 정보를 수정합니다. 변경 사항을 저장하려면 저장 버튼을 클릭하세요.
-            </DialogDescription>
-          </DialogHeader>
-          {editingMember && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">이름</Label>
-                  <Input
-                    id="name"
-                    value={editingMember.name}
-                    onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
-                    className="bg-white/50 border-white/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="joinDate">가입일</Label>
-                  <Input
-                    id="joinDate"
-                    type="date"
-                    value={editingMember.joinDate}
-                    onChange={(e) => setEditingMember({ ...editingMember, joinDate: e.target.value })}
-                    className="bg-white/50 border-white/50"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="irpAccount">IRP계좌</Label>
-                  <Select
-                    value={editingMember.irpAccount}
-                    onValueChange={(value: '개설완료' | '미개설') => setEditingMember({ ...editingMember, irpAccount: value })}
-                  >
-                    <SelectTrigger className="bg-white/50 border-white/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="개설완료">개설완료</SelectItem>
-                      <SelectItem value="미개설">미개설</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="defaultOption">디폴트옵션</Label>
-                  <Select
-                    value={editingMember.defaultOption}
-                    onValueChange={(value) => setEditingMember({ ...editingMember, defaultOption: value })}
-                  >
-                    <SelectTrigger className="bg-white/50 border-white/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="설정완료">설정완료</SelectItem>
-                      <SelectItem value="미설정">미설정</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="balance">적립금</Label>
-                <Input
-                  id="balance"
-                  value={editingMember.balance}
-                  onChange={(e) => setEditingMember({ ...editingMember, balance: e.target.value })}
-                  className="bg-white/50 border-white/50"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditOpen(false)} className="border-white/50 bg-white/30">
-              취소
-            </Button>
-            <Button onClick={handleEditSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Register Member Dialog */}
-      <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
-        <DialogContent className="sm:max-w-[500px] glass-strong border-white/30">
-          <DialogHeader>
-            <DialogTitle>가입자 등록</DialogTitle>
-            <DialogDescription>
-              새 가입자 정보를 입력합니다. 등록하려면 저장 버튼을 클릭하세요.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="reg-name">이름</Label>
-                <Input
-                  id="reg-name"
-                  value={newMember.name}
-                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-                  className="bg-white/50 border-white/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reg-joinDate">가입일</Label>
-                <Input
-                  id="reg-joinDate"
-                  type="date"
-                  value={newMember.joinDate}
-                  onChange={(e) => setNewMember({ ...newMember, joinDate: e.target.value })}
-                  className="bg-white/50 border-white/50"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="reg-rrn">주민번호</Label>
-                <Input
-                  id="reg-rrn"
-                  value={regRrn}
-                  onChange={(e) => setRegRrn(formatRrn(e.target.value))}
-                  placeholder="000000-0000000"
-                  maxLength={14}
-                  className="bg-white/50 border-white/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reg-employeeType">임직원</Label>
-                <Select
-                  value={regEmployeeType}
-                  onValueChange={(value: 'EMPLOYEE' | 'EXECUTIVE') => setRegEmployeeType(value)}
-                >
-                  <SelectTrigger className="bg-white/50 border-white/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EMPLOYEE">EMPLOYEE</SelectItem>
-                    <SelectItem value="EXECUTIVE">EXECUTIVE</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="reg-irpAccount">IRP계좌</Label>
-                <Select
-                  value={newMember.irpAccount}
-                  onValueChange={(value: '개설완료' | '미개설') => setNewMember({ ...newMember, irpAccount: value })}
-                >
-                  <SelectTrigger className="bg-white/50 border-white/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="개설완료">개설완료</SelectItem>
-                    <SelectItem value="미개설">미개설</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reg-defaultOption">디폴트옵션</Label>
-                <Select
-                  value={newMember.defaultOption}
-                  onValueChange={(value) => setNewMember({ ...newMember, defaultOption: value })}
-                >
-                  <SelectTrigger className="bg-white/50 border-white/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="설정완료">설정완료</SelectItem>
-                    <SelectItem value="미설정">미설정</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reg-balance">적립금</Label>
-              <Input
-                id="reg-balance"
-                value={newMember.balance}
-                onChange={(e) => setNewMember({ ...newMember, balance: e.target.value })}
-                className="bg-white/50 border-white/50"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRegisterOpen(false)} className="border-white/50 bg-white/30">
-              취소
-            </Button>
-            <Button onClick={handleRegisterSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent className="glass-strong border-white/30">
-          <AlertDialogHeader>
-            <AlertDialogTitle>가입자 삭제</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deletingMember && (
-                <>
-                  <span className="font-semibold text-foreground">{deletingMember.name}</span>님의 정보를 삭제하시겠습니까?
-                  <br />
-                  이 작업은 되돌릴 수 없습니다.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-white/50 bg-white/30">취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-            >
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 가입자 상세 모달 */}
-      <SubscriberDetailModal
-        subscriber={subscriberDetail}
-        open={!!subscriberDetail}
-        onClose={() => setSubscriberDetail(null)}
-      />
     </div>
   )
 }
