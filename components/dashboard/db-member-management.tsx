@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,6 +58,7 @@ function toggle(list: string[], value: string): string[] {
 }
 
 export function MemberManagement() {
+  const router = useRouter()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -254,6 +256,7 @@ export function MemberManagement() {
                   filteredMembers.map((member, idx) => (
                     <tr
                       key={member.id}
+                      onClick={() => router.push(`/pension/db/members/${member.id}`)}
                       className="border-b border-white/20 cursor-pointer hover:bg-primary/10 transition-colors duration-200 animate-slide-up"
                       style={{ animationDelay: `${(idx + 3) * 50}ms` }}
                     >
