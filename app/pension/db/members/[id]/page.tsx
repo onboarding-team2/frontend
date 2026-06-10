@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, IdCard, Wallet, TrendingUp } from 'lucide-react'
-import { getDcMemberDetail, EmployeeDetail } from '@/lib/api'
+import { getDbMemberDetail, EmployeeDetail } from '@/lib/api'
 
 function fmtDate(value: string | null | undefined) {
   return value && value.length > 0 ? value : '-'
@@ -13,10 +13,6 @@ function fmtDate(value: string | null | undefined) {
 
 function fmtWon(value: number | null | undefined) {
   return value != null ? `${value.toLocaleString()}원` : '-'
-}
-
-function isDefaultSelected(value: unknown) {
-  return value === true || value === 'Y'
 }
 
 function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
@@ -28,7 +24,7 @@ function InfoField({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function DCMemberDetailPage() {
+export default function DBMemberDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const id = Number(params.id)
@@ -41,7 +37,7 @@ export default function DCMemberDetailPage() {
     const controller = new AbortController()
     setLoading(true)
     setError(false)
-    getDcMemberDetail(id, controller.signal)
+    getDbMemberDetail(id, controller.signal)
       .then(setDetail)
       .catch((e) => {
         if (e?.name !== 'AbortError') setError(true)
@@ -50,7 +46,7 @@ export default function DCMemberDetailPage() {
     return () => controller.abort()
   }, [id])
 
-  const goBack = () => router.push('/pension/dc/members')
+  const goBack = () => router.push('/pension/db/members')
 
   if (loading) {
     return (
@@ -131,7 +127,7 @@ export default function DCMemberDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 퇴직연금 정보 */}
+        {/* 퇴직연금 정보 (DB형: 디폴트옵션/기산일/적립금 없음) */}
         <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '150ms' }}>
           <CardHeader className="border-b border-white/30">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -140,20 +136,6 @@ export default function DCMemberDetailPage() {
           </CardHeader>
           <CardContent className="p-6 grid grid-cols-2 gap-x-6 gap-y-5">
             <InfoField label="가입자 계좌" value={r?.employeeAccount ?? '-'} />
-            <InfoField label="가입일" value={fmtDate(r?.joinDate)} />
-            <InfoField label="입사일" value={fmtDate(r?.startDate)} />
-            <InfoField label="기산일" value={fmtDate(r?.effectiveDate)} />
-            <InfoField label="퇴사일" value={fmtDate(r?.terminationDate)} />
-            <InfoField
-              label="디폴트옵션"
-              value={
-                <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${
-                  isDefaultSelected(r?.defaultOption) ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'
-                }`}>
-                  {isDefaultSelected(r?.defaultOption) ? '선정' : '미선정'}
-                </span>
-              }
-            />
             <InfoField
               label="IRP 계좌"
               value={
@@ -164,12 +146,14 @@ export default function DCMemberDetailPage() {
                 </span>
               }
             />
-            <InfoField label="적립금" value={fmtWon(r?.balance)} />
+            <InfoField label="가입일" value={fmtDate(r?.joinDate)} />
+            <InfoField label="입사일" value={fmtDate(r?.startDate)} />
+            <InfoField label="퇴사일" value={fmtDate(r?.terminationDate)} />
           </CardContent>
         </Card>
       </div>
 
-      {/* 연봉 정보 */}
+      {/* 연도별 연봉 */}
       <Card className="glass border-0 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
         <CardHeader className="border-b border-white/30">
           <CardTitle className="text-lg flex items-center gap-2">

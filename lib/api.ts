@@ -170,6 +170,7 @@ export type EmployeeDetail = {
     effectiveDate: string | null
     terminationDate: string | null
     defaultOption: boolean | null
+    hasIrpAccount: string | null
     balance: number | null
     status: EmployeeStatus | null
   } | null
@@ -324,6 +325,16 @@ export async function completeScheduleDc(id: number): Promise<ScheduleDcDetail> 
 
 export async function getDcMemberDetail(id: number, signal?: AbortSignal): Promise<EmployeeDetail> {
   const res = await fetch(`${API_BASE}/pension/dc/members/${id}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '가입자 상세 조회 실패'))
+  return res.json()
+}
+
+export async function getDbMemberDetail(id: number, signal?: AbortSignal): Promise<EmployeeDetail> {
+  const res = await fetch(`${API_BASE}/pension/db/members/${id}`, {
     headers: authHeaders(),
     cache: 'no-store',
     signal,
