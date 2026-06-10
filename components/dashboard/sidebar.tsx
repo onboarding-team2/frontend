@@ -65,9 +65,16 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('planType')
+    
+    deleteCookie('token')
+
     router.push('/')
   }
   
+
+  const deleteCookie = (name: string) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+  };
 
   return (
     <aside className="hidden md:flex w-72 glass-strong border-r border-white/30 flex-col sticky top-0 h-screen">
