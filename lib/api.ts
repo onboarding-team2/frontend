@@ -53,6 +53,22 @@ async function pensionFetch(path: string, signal?: AbortSignal): Promise<unknown
   return res.json()
 }
 
+export type CompanyProfile = {
+  companyName: string
+  businessNumber: string
+  planType: string
+}
+
+export async function getCompanyProfile(signal?: AbortSignal): Promise<CompanyProfile> {
+  const res = await fetch(`${API_BASE}/company/profile`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '기업 정보 조회 실패'))
+  return res.json()
+}
+
 export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashboard> {
   const r = await pensionFetch('/dashboard', signal) as Record<string, unknown>
   return {
