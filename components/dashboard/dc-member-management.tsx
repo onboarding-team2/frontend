@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,19 +22,26 @@ interface Member {
   contribution: '납입완료' | '미납'
 }
 
+// label: 팝업 안에서 보이는 짧은 라벨 / chip: 적용된 필터 칩에 보이는 라벨(맥락 포함)
 const FILTER_GROUPS: {
   key: FilterKey
   label: string
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; chip?: string }[]
 }[] = [
   { key: 'status', label: '재직여부', options: [{ value: '재직', label: '재직중' }, { value: '퇴직', label: '퇴직' }] },
   { key: 'type', label: '구분', options: [{ value: '사원', label: '사원' }, { value: '임원', label: '임원' }] },
-  { key: 'irp', label: 'IRP계좌', options: [{ value: '보유', label: '보유' }, { value: '미보유', label: '미보유' }] },
-  { key: 'default', label: '디폴트옵션', options: [{ value: '선정', label: '선정' }, { value: '미선정', label: '미선정' }] },
-  { key: 'contribution', label: '부담금 납입여부', options: [{ value: '납입완료', label: '납입완료' }, { value: '미납', label: '미납' }] },
+  { key: 'irp', label: 'IRP계좌', options: [{ value: '보유', label: '보유', chip: 'IRP 보유' }, { value: '미보유', label: '미보유', chip: 'IRP 미보유' }] },
+  { key: 'default', label: '디폴트옵션', options: [{ value: '선정', label: '선정', chip: '디폴트옵션 선정' }, { value: '미선정', label: '미선정', chip: '디폴트옵션 미선정' }] },
+  { key: 'contribution', label: '부담금 납입여부', options: [{ value: '납입완료', label: '납입완료', chip: '부담금 납입완료' }, { value: '미납', label: '미납', chip: '부담금 미납' }] },
 ]
 
 const EMPTY_FILTERS: Record<FilterKey, string[]> = { status: [], type: [], irp: [], default: [], contribution: [] }
+
+// 대시보드 "미처리 현황"에서 넘어올 때의 프리셋(서버 필터) → 동일한 (필터키, 값)으로 매핑해 칩도 통일
+const PRESET_TO_FILTER: Record<string, { key: FilterKey; value: string }> = {
+  'default-unset': { key: 'default', value: '미선정' },
+  'irp-none': { key: 'irp', value: '미보유' },
+}
 
 function toMember(item: Awaited<ReturnType<typeof getPensionMembers>>[0]): Member {
   return {
@@ -66,6 +73,10 @@ function toggle(list: string[], value: string): string[] {
 
 export function MemberManagement() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preset = searchParams.get('filter')
+  const presetFilter = preset ? PRESET_TO_FILTER[preset] : undefined
+
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -77,19 +88,36 @@ export function MemberManagement() {
 
   useEffect(() => {
     const controller = new AbortController()
-    getPensionMembers(controller.signal)
+    setLoading(true)
+    getPensionMembers(controller.signal, preset)
       .then(data => setMembers(data.map(toMember)))
       .catch(() => {})
       .finally(() => setLoading(false))
     return () => controller.abort()
-  }, [])
+  }, [preset])
 
   const openFilter = () => {
-    setPending(filters)
+    // 대시보드에서 넘어온 프리셋도 팝업에서 체크된 상태로 보이게
+    if (presetFilter) {
+      setPending({
+        ...filters,
+        [presetFilter.key]: Array.from(new Set([...filters[presetFilter.key], presetFilter.value])),
+      })
+    } else {
+      setPending(filters)
+    }
     setFilterOpen(true)
   }
   const applyFilter = () => {
-    setFilters(pending)
+    let next = pending
+    if (presetFilter) {
+      const stillSelected = pending[presetFilter.key].includes(presetFilter.value)
+      // 프리셋 값은 별도 프리셋 칩으로 보여주므로 클라이언트 필터에서는 제외(칩 중복 방지)
+      next = { ...pending, [presetFilter.key]: pending[presetFilter.key].filter(v => v !== presetFilter.value) }
+      // 팝업에서 프리셋을 해제했다면 URL 프리셋 제거 → 전체 재조회
+      if (!stillSelected) router.push('/pension/dc/members')
+    }
+    setFilters(next)
     setFilterOpen(false)
   }
   const togglePending = (key: FilterKey, value: string) =>
@@ -98,8 +126,10 @@ export function MemberManagement() {
     setFilters(prev => ({ ...prev, [key]: prev[key].filter(v => v !== value) }))
 
   const activeCount = FILTER_GROUPS.reduce((sum, g) => sum + filters[g.key].length, 0)
-  const labelOf = (key: FilterKey, value: string) =>
-    FILTER_GROUPS.find(g => g.key === key)?.options.find(o => o.value === value)?.label ?? value
+  const labelOf = (key: FilterKey, value: string) => {
+    const opt = FILTER_GROUPS.find(g => g.key === key)?.options.find(o => o.value === value)
+    return opt?.chip ?? opt?.label ?? value
+  }
 
   // 검색 + 필터 + 이름 가나다순 정렬
   const filteredMembers = members
@@ -199,8 +229,17 @@ export function MemberManagement() {
           </div>
 
           {/* 적용된 필터 칩 */}
-          {activeCount > 0 && (
+          {(presetFilter || activeCount > 0) && (
             <div className="flex flex-wrap items-center gap-2">
+              {/* 미처리 현황 프리셋(서버 필터) — 클라이언트 칩과 동일한 문구/색 */}
+              {presetFilter && (
+                <span className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                  {labelOf(presetFilter.key, presetFilter.value)}
+                  <button onClick={() => router.push('/pension/dc/members')} className="rounded-full hover:bg-primary/20 p-0.5 transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              )}
               {FILTER_GROUPS.flatMap((group) =>
                 filters[group.key].map((value) => (
                   <span key={`${group.key}-${value}`} className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
@@ -211,12 +250,14 @@ export function MemberManagement() {
                   </span>
                 ))
               )}
-              <button
-                onClick={() => setFilters(EMPTY_FILTERS)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors ml-1"
-              >
-                전체 해제
-              </button>
+              {activeCount > 0 && (
+                <button
+                  onClick={() => setFilters(EMPTY_FILTERS)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors ml-1"
+                >
+                  전체 해제
+                </button>
+              )}
             </div>
           )}
         </CardContent>

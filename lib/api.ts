@@ -70,8 +70,9 @@ export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashb
   }
 }
 
-export async function getPensionMembers(signal?: AbortSignal): Promise<Employee[]> {
-  const result = await pensionFetch('/members', signal) as Record<string, unknown>[]
+export async function getPensionMembers(signal?: AbortSignal, filter?: string | null): Promise<Employee[]> {
+  const query = filter ? `?filter=${encodeURIComponent(filter)}` : ''
+  const result = await pensionFetch(`/members${query}`, signal) as Record<string, unknown>[]
   return result.map((item) => ({
     id: item.id as number,
     name: item.name as string,
