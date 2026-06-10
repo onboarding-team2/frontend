@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Filter, Users, X, Check } from 'lucide-react'
-import { getDbMembers } from '@/lib/api'
+import { Search, Filter, Users, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { getDbMemberPage, MemberPage } from '@/lib/api'
+import { formatRrnAsBirthDate } from '@/lib/utils'
 
 type FilterKey = 'status' | 'type' | 'irp'
 
@@ -17,10 +18,8 @@ interface Member {
   position: string
   joinDate: string
   status: '재직' | '퇴직'
-  irp: '보유' | '미보유'
 }
 
-// label: 팝업 안에서 보이는 짧은 라벨 / chip: 적용된 필터 칩에 보이는 라벨(맥락 포함)
 const FILTER_GROUPS: {
   key: FilterKey
   label: string
@@ -31,9 +30,11 @@ const FILTER_GROUPS: {
   { key: 'irp', label: 'IRP계좌', options: [{ value: '보유', label: '보유', chip: 'IRP 보유' }, { value: '미보유', label: '미보유', chip: 'IRP 미보유' }] },
 ]
 
-const EMPTY_FILTERS: Record<FilterKey, string[]> = { status: [], type: [], irp: [] }
+const FILTER_KEYS = FILTER_GROUPS.map(g => g.key)
+const PAGE_SIZE = 20
+const PATH = '/pension/db/members'
 
-function toMember(item: Awaited<ReturnType<typeof getDbMembers>>[0]): Member {
+function toMember(item: MemberPage['members'][0]): Member {
   return {
     id: String(item.id),
     name: item.name,
@@ -41,15 +42,6 @@ function toMember(item: Awaited<ReturnType<typeof getDbMembers>>[0]): Member {
     position: item.position ?? '-',
     joinDate: item.joinDate ?? '-',
     status: item.status === '퇴직' ? '퇴직' : '재직',
-    irp: item.hasIrpAccount === 'Y' ? '보유' : '미보유',
-  }
-}
-
-function memberValue(m: Member, key: FilterKey): string {
-  switch (key) {
-    case 'status': return m.status
-    case 'type': return m.position
-    case 'irp': return m.irp
   }
 }
 
@@ -59,48 +51,85 @@ function toggle(list: string[], value: string): string[] {
 
 export function MemberManagement() {
   const router = useRouter()
-  const [members, setMembers] = useState<Member[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const searchParams = useSearchParams()
+  const spString = searchParams.toString()
 
-  // 적용된 필터 / 팝업 내 임시 선택
-  const [filters, setFilters] = useState<Record<FilterKey, string[]>>(EMPTY_FILTERS)
-  const [pending, setPending] = useState<Record<FilterKey, string[]>>(EMPTY_FILTERS)
+  const urlFilters: Record<FilterKey, string[]> = {
+    status: searchParams.getAll('status'),
+    type: searchParams.getAll('type'),
+    irp: searchParams.getAll('irp'),
+  }
+  const nameParam = searchParams.get('name') ?? ''
+  const page = Math.max(0, parseInt(searchParams.get('page') ?? '0', 10) || 0)
+
+  const [members, setMembers] = useState<Member[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  const [searchInput, setSearchInput] = useState(nameParam)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [pending, setPending] = useState<Record<FilterKey, string[]>>(urlFilters)
 
   useEffect(() => {
-    const controller = new AbortController()
-    getDbMembers(controller.signal)
-      .then(data => setMembers(data.map(toMember)))
+    const ctrl = new AbortController()
+    setLoading(true)
+    getDbMemberPage({
+      name: searchParams.get('name') ?? undefined,
+      status: searchParams.getAll('status'),
+      type: searchParams.getAll('type'),
+      irp: searchParams.getAll('irp'),
+      page: Math.max(0, parseInt(searchParams.get('page') ?? '0', 10) || 0),
+      size: PAGE_SIZE,
+    }, ctrl.signal)
+      .then(res => { setMembers(res.members.map(toMember)); setTotal(res.totalCount); setTotalPages(res.totalPages) })
       .catch(() => {})
       .finally(() => setLoading(false))
-    return () => controller.abort()
-  }, [])
+    return () => ctrl.abort()
+  }, [spString]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openFilter = () => {
-    setPending(filters)
-    setFilterOpen(true)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchInput !== (searchParams.get('name') ?? '')) {
+        const p = new URLSearchParams(searchParams.toString())
+        if (searchInput) p.set('name', searchInput); else p.delete('name')
+        p.set('page', '0')
+        router.replace(`${PATH}?${p.toString()}`)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchInput]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setParams = (mutate: (p: URLSearchParams) => void) => {
+    const p = new URLSearchParams(searchParams.toString())
+    mutate(p)
+    router.push(`${PATH}?${p.toString()}`)
   }
+
+  const openFilter = () => { setPending(urlFilters); setFilterOpen(true) }
   const applyFilter = () => {
-    setFilters(pending)
+    setParams(p => {
+      FILTER_KEYS.forEach(k => { p.delete(k); pending[k].forEach(v => p.append(k, v)) })
+      p.set('page', '0')
+    })
     setFilterOpen(false)
   }
   const togglePending = (key: FilterKey, value: string) =>
     setPending(prev => ({ ...prev, [key]: toggle(prev[key], value) }))
   const removeChip = (key: FilterKey, value: string) =>
-    setFilters(prev => ({ ...prev, [key]: prev[key].filter(v => v !== value) }))
+    setParams(p => {
+      const vals = p.getAll(key).filter(v => v !== value)
+      p.delete(key); vals.forEach(v => p.append(key, v)); p.set('page', '0')
+    })
+  const clearAll = () =>
+    setParams(p => { FILTER_KEYS.forEach(k => p.delete(k)); p.set('page', '0') })
+  const goPage = (n: number) => setParams(p => p.set('page', String(n)))
 
-  const activeCount = FILTER_GROUPS.reduce((sum, g) => sum + filters[g.key].length, 0)
+  const activeCount = FILTER_KEYS.reduce((s, k) => s + urlFilters[k].length, 0)
   const labelOf = (key: FilterKey, value: string) => {
     const opt = FILTER_GROUPS.find(g => g.key === key)?.options.find(o => o.value === value)
     return opt?.chip ?? opt?.label ?? value
   }
-
-  // 검색 + 필터 + 이름 가나다순 정렬
-  const filteredMembers = members
-    .filter((m) => m.name.includes(searchTerm))
-    .filter((m) => FILTER_GROUPS.every(g => filters[g.key].length === 0 || filters[g.key].includes(memberValue(m, g.key))))
-    .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
 
   return (
     <div className="space-y-6">
@@ -124,13 +153,12 @@ export function MemberManagement() {
               <Input
                 type="text"
                 placeholder="이름으로 검색"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-11 h-11 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
               />
             </div>
 
-            {/* 필터 버튼 + 팝업 */}
             <div className="relative">
               <Button
                 variant="outline"
@@ -150,7 +178,6 @@ export function MemberManagement() {
 
               {filterOpen && (
                 <>
-                  {/* 바깥 클릭 시 닫기 */}
                   <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)} />
                   <div className="absolute right-0 mt-2 w-72 z-50 rounded-2xl border border-white/40 bg-white/90 backdrop-blur-xl shadow-xl p-4 space-y-4 animate-slide-up">
                     {FILTER_GROUPS.map((group) => (
@@ -178,7 +205,7 @@ export function MemberManagement() {
 
                     <div className="flex items-center justify-between pt-1">
                       <button
-                        onClick={() => setPending(EMPTY_FILTERS)}
+                        onClick={() => setPending({ status: [], type: [], irp: [] })}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                       >
                         초기화
@@ -197,7 +224,7 @@ export function MemberManagement() {
           {activeCount > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               {FILTER_GROUPS.flatMap((group) =>
-                filters[group.key].map((value) => (
+                urlFilters[group.key].map((value) => (
                   <span key={`${group.key}-${value}`} className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                     {labelOf(group.key, value)}
                     <button onClick={() => removeChip(group.key, value)} className="rounded-full hover:bg-primary/20 p-0.5 transition-colors">
@@ -207,7 +234,7 @@ export function MemberManagement() {
                 ))
               )}
               <button
-                onClick={() => setFilters(EMPTY_FILTERS)}
+                onClick={clearAll}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors ml-1"
               >
                 전체 해제
@@ -223,7 +250,7 @@ export function MemberManagement() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">가입자 명부</CardTitle>
             <span className="text-sm text-muted-foreground">
-              총 <span className="text-foreground font-semibold">{filteredMembers.length}</span>명
+              총 <span className="text-foreground font-semibold">{total}</span>명
             </span>
           </div>
         </CardHeader>
@@ -242,18 +269,14 @@ export function MemberManagement() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
-                      데이터를 불러오는 중...
-                    </td>
+                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">데이터를 불러오는 중...</td>
                   </tr>
-                ) : filteredMembers.length === 0 ? (
+                ) : members.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
-                      가입자가 없습니다.
-                    </td>
+                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">가입자가 없습니다.</td>
                   </tr>
                 ) : (
-                  filteredMembers.map((member, idx) => (
+                  members.map((member, idx) => (
                     <tr
                       key={member.id}
                       onClick={() => router.push(`/pension/db/members/${member.id}`)}
@@ -268,14 +291,12 @@ export function MemberManagement() {
                           <span className="font-medium text-foreground">{member.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{member.rrnMasked}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{formatRrnAsBirthDate(member.rrnMasked)}</td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{member.position}</td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{member.joinDate}</td>
                       <td className="px-6 py-4 text-center">
                         <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                          member.status === '재직'
-                            ? 'bg-emerald-100 text-emerald-600'
-                            : 'bg-gray-100 text-gray-500'
+                          member.status === '재직' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'
                         }`}>
                           {member.status}
                         </span>
@@ -286,6 +307,29 @@ export function MemberManagement() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                variant="outline" size="sm" disabled={page <= 0}
+                onClick={() => goPage(page - 1)}
+                className="border-white/50 bg-white/30 disabled:opacity-40"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                {page + 1} / {totalPages}
+              </span>
+              <Button
+                variant="outline" size="sm" disabled={page >= totalPages - 1}
+                onClick={() => goPage(page + 1)}
+                className="border-white/50 bg-white/30 disabled:opacity-40"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

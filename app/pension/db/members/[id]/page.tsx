@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, IdCard, Wallet, TrendingUp } from 'lucide-react'
 import { getDbMemberDetail, EmployeeDetail } from '@/lib/api'
+import { formatRrnAsBirthDate } from '@/lib/utils'
 
 function fmtDate(value: string | null | undefined) {
   return value && value.length > 0 ? value : '-'
@@ -119,7 +120,7 @@ export default function DBMemberDetailPage() {
           </CardHeader>
           <CardContent className="p-6 grid grid-cols-2 gap-x-6 gap-y-5">
             <InfoField label="이름" value={detail.name} />
-            <InfoField label="생년월일" value={detail.rrnMasked ?? '-'} />
+            <InfoField label="생년월일" value={formatRrnAsBirthDate(detail.rrnMasked)} />
             <InfoField label="구분" value={r?.position ?? '-'} />
             <InfoField label="회사" value={detail.company?.companyName ?? '-'} />
             <InfoField label="제도유형" value={detail.company?.planType ? `${detail.company.planType}형` : '-'} />
