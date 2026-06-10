@@ -195,7 +195,7 @@ export function Header({ onChatOpen }: HeaderProps) {
             onClick={onChatOpen}
             className="btn-hover bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white gap-2 px-5 h-11 rounded-xl shadow-lg glow-blue transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95"
           >
-            <Sparkles className="w-4 h-4 animate-pulse" />
+            <Sparkles className="w-4 h-4" />
             <MessageCircle className="w-5 h-5" />
             <span className="hidden sm:inline font-semibold">AI 상담</span>
           </Button>
