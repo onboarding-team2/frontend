@@ -136,6 +136,16 @@ export default function DBMemberDetailPage() {
           </CardHeader>
           <CardContent className="p-6 grid grid-cols-2 gap-x-6 gap-y-5">
             <InfoField label="가입자 계좌" value={r?.employeeAccount ?? '-'} />
+            <InfoField
+              label="IRP 계좌"
+              value={
+                <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${
+                  r?.hasIrpAccount === 'Y' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'
+                }`}>
+                  {r?.hasIrpAccount === 'Y' ? '보유' : '미보유'}
+                </span>
+              }
+            />
             <InfoField label="가입일" value={fmtDate(r?.joinDate)} />
             <InfoField label="입사일" value={fmtDate(r?.startDate)} />
             <InfoField label="퇴사일" value={fmtDate(r?.terminationDate)} />

@@ -170,6 +170,7 @@ export type EmployeeDetail = {
     effectiveDate: string | null
     terminationDate: string | null
     defaultOption: boolean | null
+    hasIrpAccount: string | null
     balance: number | null
     status: EmployeeStatus | null
   } | null

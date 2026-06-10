@@ -154,6 +154,16 @@ export default function DCMemberDetailPage() {
                 </span>
               }
             />
+            <InfoField
+              label="IRP 계좌"
+              value={
+                <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${
+                  r?.hasIrpAccount === 'Y' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'
+                }`}>
+                  {r?.hasIrpAccount === 'Y' ? '보유' : '미보유'}
+                </span>
+              }
+            />
             <InfoField label="적립금" value={fmtWon(r?.balance)} />
           </CardContent>
         </Card>
