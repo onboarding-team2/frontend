@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, Users, Wallet, AlertTriangle, Sparkles, CalendarClock, ShieldAlert, FileX, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
@@ -25,6 +26,7 @@ const contributionData = [
 ]
 
 export function DCOverview() {
+  const router = useRouter()
   const [data, setData] = useState<DcDashboard | null>(null)
 
   const totalMembers = data?.total_employee ?? 0
@@ -38,6 +40,7 @@ export function DCOverview() {
       chartColor: '#f59e0b',
       incompleteLabel: '미선정',
       completeLabel: '선정 완료',
+      filterKey: 'default=미선정',
     },
     {
       title: 'IRP 개설 미완료',
@@ -47,6 +50,7 @@ export function DCOverview() {
       chartColor: '#f43f5e',
       incompleteLabel: '미완료',
       completeLabel: '개설 완료',
+      filterKey: 'irp=미보유',
     },
   ]
 
@@ -63,6 +67,12 @@ export function DCOverview() {
   const dueLabel = data?.contribution_due_date
     ? data.contribution_due_date.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$2/$3')
     : '-'
+
+  const contributionTitle =
+    data?.payment_cycle === 'MONTHLY' ? '이번 달 납입 부담금': 
+    data?.payment_cycle === 'QUARTERLY' ? '이번 분기 납입 부담금': 
+    data?.payment_cycle === 'YEARLY' ? '올해 납입 부담금': 
+    '납입 부담금'
 
   return (
     <div className="space-y-6">
@@ -149,7 +159,7 @@ export function DCOverview() {
               )}
             </div>
             <div className="mt-4">
-              <p className="text-sm text-muted-foreground">이번 달 납입 부담금</p>
+              <p className="text-sm text-muted-foreground">{contributionTitle}</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.this_month_contribution) : '-'}
                 <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
@@ -252,7 +262,10 @@ export function DCOverview() {
                   </div>
 
                   <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/50">
-                    <button className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all">
+                    <button
+                      onClick={() => router.push(`/pension/dc/members?${item.filterKey}`)}
+                      className="flex items-center gap-1 text-sm text-primary font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:gap-2 hover:shadow-sm transition-all"
+                    >
                       목록 전체 보기
                       <ChevronRight className="w-4 h-4" />
                     </button>

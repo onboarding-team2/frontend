@@ -54,7 +54,8 @@ export default function LoginPage() {
      
       localStorage.setItem('token', data.token)
       localStorage.setItem('planType', data.planType)
-      Cookies.set('token', data.token, { expires: 1, path: '/' }) // 1일간 유지
+      Cookies.set('token', data.token, { expires: 1, path: '/' }) 
+      Cookies.set('planType', data.planType, { expires: 1, path: '/' })
 
       const plan = (data.planType as string)?.toLowerCase() ?? 'dc'
       router.push(`/pension/${plan}/dashboard`)
