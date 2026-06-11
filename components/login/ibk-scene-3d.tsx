@@ -224,10 +224,10 @@ export function IBKScene3D() {
       <Suspense fallback={null}>
         <ParallaxCamera />
 
-        <ambientLight intensity={0.85} color="#ffffff" />
-        <pointLight position={[6, 6, 8]} intensity={1.3} color="#2563eb" />
-        <pointLight position={[-8, -3, 6]} intensity={1.5} color="#0ea5e9" />
-        <pointLight position={[0, 8, -4]} intensity={0.85} color="#60a5fa" />
+        <ambientLight intensity={1.1} color="#ffffff" />
+        <pointLight position={[6, 6, 8]} intensity={1.2} color="#bae6fd" />
+        <pointLight position={[-8, -3, 6]} intensity={1.4} color="#e0f2fe" />
+        <pointLight position={[0, 8, -4]} intensity={0.9} color="#bae6fd" />
         <directionalLight position={[5, 10, 5]} intensity={0.6} color="#ffffff" />
 
         {/* IBK 글자 — I는 헤드라인-B 사이 갭, B는 중앙, K는 우하단 */}
@@ -235,8 +235,8 @@ export function IBKScene3D() {
           char="I"
           position={[-1.3, 1.6, -1.5]}
           rotation={[0.1, -0.25, -0.05]}
-          color="#60a5fa"
-          emissive="#3b82f6"
+          color="#bae6fd"
+          emissive="#7dd3fc"
           scale={1.5}
           floatSpeed={0.95}
         />
@@ -244,8 +244,8 @@ export function IBKScene3D() {
           char="B"
           position={[0.8, 1.0, -0.8]}
           rotation={[-0.05, -0.28, 0.04]}
-          color="#3b82f6"
-          emissive="#1e40af"
+          color="#93c5fd"
+          emissive="#60a5fa"
           scale={1.3}
           floatSpeed={0.85}
         />
@@ -253,25 +253,25 @@ export function IBKScene3D() {
           char="K"
           position={[5.5, -1.9, -0.5]}
           rotation={[0.18, -0.4, 0.06]}
-          color="#2563eb"
-          emissive="#1e40af"
+          color="#60a5fa"
+          emissive="#3b82f6"
           scale={1.5}
           floatSpeed={1.0}
         />
 
-        {/* 글래스 큐브 ×2 — 진한 블루 톤 */}
-        <GlassCube position={[-6.0, -1.5, 0]} scale={0.95} color="#60a5fa" floatSpeed={1.2} />
-        <GlassCube position={[5.2, 2.5, -0.5]} scale={0.75} color="#93c5fd" rotation={[0.2, 0.6, 0]} floatSpeed={1.0} />
+        {/* 글래스 큐브 ×2 — 밝은 하늘 톤 */}
+        <GlassCube position={[-6.0, -1.5, 0]} scale={0.95} color="#bae6fd" floatSpeed={1.2} />
+        <GlassCube position={[5.2, 2.5, -0.5]} scale={0.75} color="#7dd3fc" rotation={[0.2, 0.6, 0]} floatSpeed={1.0} />
 
         {/* 얼음 구 ×2 */}
-        <GlossySphere position={[-5.5, -3.0, 0]} scale={0.95} color="#3b82f6" floatSpeed={1.3} />
-        <GlossySphere position={[6.5, 1.0, -2]} scale={0.65} color="#60a5fa" floatSpeed={1.1} />
+        <GlossySphere position={[-5.5, -3.0, 0]} scale={0.95} color="#93c5fd" floatSpeed={1.3} />
+        <GlossySphere position={[6.5, 1.0, -2]} scale={0.65} color="#bae6fd" floatSpeed={1.1} />
 
         {/* 얼음 토러스 — 좌측 상단 (살짝 왼쪽 아래로) */}
-        <GlossyTorus position={[-6.5, 2.8, -1.5]} rotation={[0.5, 0.2, 0]} scale={0.7} color="#60a5fa" floatSpeed={0.95} />
+        <GlossyTorus position={[-6.5, 2.8, -1.5]} rotation={[0.5, 0.2, 0]} scale={0.7} color="#7dd3fc" floatSpeed={0.95} />
 
         {/* 얼음 크리스털 */}
-        <GlossyOcta position={[-2.5, 3.2, -1.5]} scale={0.75} color="#93c5fd" floatSpeed={1.3} />
+        <GlossyOcta position={[-2.5, 3.2, -1.5]} scale={0.75} color="#f0f9ff" floatSpeed={1.3} />
 
         {/* 떠다니는 입자 */}
         <Sparkles

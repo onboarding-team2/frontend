@@ -58,7 +58,7 @@ it-onboarding-project/
 │   │   ├── header.tsx            # 상단 헤더 / 검색 / 챗봇 열기
 │   │   ├── overview.tsx          # 현황 대시보드 (DashboardOverview)
 │   │   ├── member-management.tsx # 가입자 관리
-│   │   ├── schedule-management.tsx   # 기일 알림
+│   │   ├── deadline-alerts.tsx   # 기일 알림
 │   │   ├── document-forms.tsx    # 서류 양식
 │   │   └── chatbot.tsx           # AI 챗봇 패널
 │   └── ui/                   # shadcn/ui (실사용분만 유지)
@@ -80,7 +80,7 @@ it-onboarding-project/
 app/page.tsx (로그인)
   └─ app/dashboard/page.tsx
        ├─ Sidebar → activeTab 전환
-       ├─ activeTab → overview / members / schedules / documents 렌더
+       ├─ activeTab → overview / members / deadlines / documents 렌더
        └─ Header 챗봇 버튼 → ChatBot 토글
 ```
 

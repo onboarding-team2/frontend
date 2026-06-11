@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, Users, Wallet, AlertTriangle, CalendarClock, ShieldAlert, FileX, ChevronRight } from 'lucide-react'
+import { TrendingUp, Users, Wallet, AlertTriangle, Sparkles, CalendarClock, ShieldAlert, FileX, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { getPensionDashboard, DcDashboard, getCompanyProfile, CompanyProfile } from '@/lib/api'
-import { WelcomeBanner } from './welcome-banner'
+import { getPensionDashboard, DcDashboard } from '@/lib/api'
 
 function toEok(amount: number): string {
   return (amount / 1000000).toFixed(0)
@@ -29,7 +28,6 @@ const contributionData = [
 export function DCOverview() {
   const router = useRouter()
   const [data, setData] = useState<DcDashboard | null>(null)
-  const [company, setCompany] = useState<CompanyProfile | null>(null)
 
   const totalMembers = data?.total_employee ?? 0
 
@@ -63,11 +61,6 @@ export function DCOverview() {
       .catch((e: unknown) => {
         if (e instanceof DOMException && e.name === 'AbortError') return
       })
-    getCompanyProfile(ctrl.signal)
-      .then(setCompany)
-      .catch((e: unknown) => {
-        if (e instanceof DOMException && e.name === 'AbortError') return
-      })
     return () => ctrl.abort()
   }, [])
 
@@ -84,12 +77,27 @@ export function DCOverview() {
   return (
     <div className="space-y-6">
       {/* Welcome Hero */}
-      <WelcomeBanner planType="DC" companyName={company?.companyName} />
+      <div className="glass rounded-2xl p-8 relative overflow-hidden animate-scale-in">
+        <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-accent/20 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-accent/20">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <span className="text-sm text-primary font-medium">퇴직연금 관리 현황</span>
+          </div>
+          <h2 className="text-3xl font-bold text-foreground mb-2">
+            안녕하세요, <span className="gradient-text">김담당자</span>님
+          </h2>
+          <p className="text-muted-foreground">오늘의 퇴직연금 현황을 확인해보세요</p>
+        </div>
+      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* DC형 총 적립금 */}
-        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up" style={{ animationDelay: '0ms' }}>
           <CardContent className="p-6">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
               <Wallet className="w-6 h-6 text-white" />
@@ -105,7 +113,7 @@ export function DCOverview() {
         </Card>
 
         {/* 총 가입자 수 */}
-        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up">
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up" style={{ animationDelay: '100ms' }}>
           <CardContent className="p-6">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
               <Users className="w-6 h-6 text-white" />
@@ -121,7 +129,7 @@ export function DCOverview() {
         </Card>
 
         {/* 디폴트옵션 미지정자 */}
-        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-amber-500/15 to-amber-500/5 animate-slide-up">
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-amber-500/15 to-amber-500/5 animate-slide-up" style={{ animationDelay: '200ms' }}>
           <CardContent className="p-6">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
               <AlertTriangle className="w-6 h-6 text-white" />
@@ -137,7 +145,7 @@ export function DCOverview() {
         </Card>
 
         {/* 이번 달 납입 부담금 */}
-        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up" style={{ animationDelay: '300ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
@@ -165,7 +173,7 @@ export function DCOverview() {
       </div>
 
       {/* 미처리 완료 현황 */}
-      <Card className="glass border-0 animate-slide-up">
+      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '250ms' }}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-red-400 flex items-center justify-center shadow-md">
@@ -190,6 +198,7 @@ export function DCOverview() {
                 <div
                   key={item.title}
                   className="p-5 bg-white/50 rounded-2xl border border-white/50 hover:bg-white/80 transition-all duration-300 hover:shadow-md"
+                  style={{ animationDelay: `${idx * 80}ms` }}
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2.5">
@@ -269,7 +278,7 @@ export function DCOverview() {
       </Card>
 
       {/* DC형 부담금 납입 현황 */}
-      <Card className="glass border-0 animate-slide-up">
+      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '300ms' }}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">

@@ -80,7 +80,7 @@ export function DocumentForms() {
       </div>
 
       {/* Search */}
-      <Card className="glass border-0 animate-slide-up">
+      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '100ms' }}>
         <CardContent className="p-4">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -97,7 +97,7 @@ export function DocumentForms() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Categories Sidebar */}
-        <Card className="glass border-0 lg:col-span-1 h-fit animate-slide-up">
+        <Card className="glass border-0 lg:col-span-1 h-fit animate-slide-up" style={{ animationDelay: '150ms' }}>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Folder className="w-5 h-5 text-primary" />
@@ -133,7 +133,7 @@ export function DocumentForms() {
 
         {/* Documents List */}
         <div className="lg:col-span-3 space-y-4">
-          <div className="flex items-center justify-between animate-slide-up">
+          <div className="flex items-center justify-between animate-slide-up" style={{ animationDelay: '200ms' }}>
             <p className="text-sm text-muted-foreground">
               총 <span className="text-foreground font-semibold">{filteredDocuments.length}</span>개의 서류
             </p>
@@ -143,7 +143,8 @@ export function DocumentForms() {
             {filteredDocuments.map((doc, idx) => (
               <Card 
                 key={doc.id} 
-                className="glass border-0 card-interactive"
+                className="glass border-0 card-interactive animate-slide-up"
+                style={{ animationDelay: `${(idx + 3) * 50}ms` }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
@@ -174,7 +175,7 @@ export function DocumentForms() {
       </div>
 
       {/* Chatbot CTA */}
-      <Card className="glass border-0 bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 border border-primary/20 hover-lift animate-slide-up">
+      <Card className="glass border-0 bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 border border-primary/20 hover-lift animate-slide-up" style={{ animationDelay: '400ms' }}>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Search, Filter, Users, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getDcMemberPage, MemberPage } from '@/lib/api'
 import { formatRrnAsBirthDate } from '@/lib/utils'
-import { Skeleton } from '@/components/ui/skeleton'
 
 type FilterKey = 'status' | 'type' | 'irp' | 'default' | 'contribution'
 
@@ -156,7 +155,7 @@ export function MemberManagement() {
       </div>
 
       {/* Search + Filter */}
-      <Card className="glass border-0 animate-slide-up">
+      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '100ms' }}>
         <CardContent className="p-4 space-y-3">
           <div className="flex gap-3">
             <div className="flex-1 relative group">
@@ -257,7 +256,7 @@ export function MemberManagement() {
       </Card>
 
       {/* Members Table */}
-      <Card className="glass border-0 overflow-hidden animate-slide-up">
+      <Card className="glass border-0 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
         <CardHeader className="border-b border-white/30">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">가입자 명부</CardTitle>
@@ -280,20 +279,9 @@ export function MemberManagement() {
               </thead>
               <tbody>
                 {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={`sk-${i}`} className="border-b border-white/20">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <Skeleton className="w-8 h-8 rounded-lg" />
-                          <Skeleton className="h-4 w-20" />
-                        </div>
-                      </td>
-                      <td className="px-6 py-4"><Skeleton className="h-3.5 w-24" /></td>
-                      <td className="px-6 py-4"><Skeleton className="h-3.5 w-14" /></td>
-                      <td className="px-6 py-4"><Skeleton className="h-3.5 w-24" /></td>
-                      <td className="px-6 py-4 text-center"><Skeleton className="h-6 w-14 mx-auto rounded-lg" /></td>
-                    </tr>
-                  ))
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">데이터를 불러오는 중...</td>
+                  </tr>
                 ) : members.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">가입자가 없습니다.</td>
@@ -303,7 +291,8 @@ export function MemberManagement() {
                     <tr
                       key={member.id}
                       onClick={() => router.push(`/pension/dc/members/${member.id}`)}
-                      className="border-b border-white/20 cursor-pointer hover:bg-primary/10 transition-colors duration-200"
+                      className="border-b border-white/20 cursor-pointer hover:bg-primary/10 transition-colors duration-200 animate-slide-up"
+                      style={{ animationDelay: `${(idx + 3) * 50}ms` }}
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">

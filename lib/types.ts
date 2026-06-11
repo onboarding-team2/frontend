@@ -1,1 +1,1 @@
-export type TabType = 'overview' | 'members' | 'schedules' | 'documents'
+export type TabType = 'overview' | 'members' | 'deadlines' | 'documents'
