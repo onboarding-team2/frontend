@@ -28,6 +28,8 @@ import {
   ArrowUpRight,
   Target,
   Pencil,
+  Minus,
+  Plus,
 } from 'lucide-react'
 
 type SubTab = 'current' | 'sim'
@@ -211,7 +213,7 @@ export function AssetManagement() {
       </div>
 
       {/* Sub Tabs */}
-      <div className="inline-flex gap-1 p-1 rounded-xl bg-white/50 border border-white/50 animate-slide-up" style={{ animationDelay: '80ms' }}>
+      <div className="inline-flex gap-1 p-1 rounded-xl bg-white/50 border border-white/50 animate-slide-up">
         {[
           { id: 'current' as SubTab, label: '현재 운용', icon: PieIcon },
           { id: 'sim' as SubTab, label: '자산운용 시뮬레이션', icon: SlidersHorizontal },
@@ -269,7 +271,7 @@ function CurrentPane() {
     <div className="space-y-6">
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
+        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg">
@@ -290,7 +292,7 @@ function CurrentPane() {
           </CardContent>
         </Card>
 
-        <Card className="glass border-0 card-interactive bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-sky-500/15 to-sky-500/5 animate-slide-up">
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg">
@@ -311,7 +313,7 @@ function CurrentPane() {
           </CardContent>
         </Card>
 
-        <Card className="glass border-0 card-interactive bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 animate-slide-up" style={{ animationDelay: '200ms' }}>
+        <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 animate-slide-up">
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-400 flex items-center justify-center shadow-lg">
@@ -331,28 +333,56 @@ function CurrentPane() {
               <p className="text-sm text-muted-foreground">목표 수익률</p>
               {editingTarget ? (
                 <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    step="0.1"
-                    min={0}
-                    max={100}
-                    autoFocus
-                    value={targetDraft}
-                    onChange={(e) => setTargetDraft(e.target.value)}
-                    onBlur={commitTarget}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitTarget()
-                      if (e.key === 'Escape') { setTargetDraft(targetReturn.toString()); setEditingTarget(false) }
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      const v = parseFloat(targetDraft)
+                      if (!isNaN(v) && v - 0.1 >= 0) setTargetDraft((v - 0.1).toFixed(1))
                     }}
-                    className="w-20 text-2xl font-bold text-foreground bg-white/70 border border-primary/40 rounded-lg px-2 py-0.5 outline-none focus:border-primary"
-                    aria-label="목표 수익률 입력"
-                  />
-                  <span className="text-lg font-bold text-foreground">%</span>
+                    className="w-8 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary flex items-center justify-center transition-colors"
+                    aria-label="0.1 감소"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-baseline gap-0.5">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min={0}
+                      max={100}
+                      autoFocus
+                      value={targetDraft}
+                      onChange={(e) => setTargetDraft(e.target.value)}
+                      onBlur={commitTarget}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitTarget()
+                        if (e.key === 'Escape') { setTargetDraft(targetReturn.toString()); setEditingTarget(false) }
+                      }}
+                      className="w-16 text-3xl font-bold text-foreground text-center bg-transparent border-b-2 border-primary/40 focus:border-primary outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      aria-label="목표 수익률 입력"
+                    />
+                    <span className="text-3xl font-bold text-foreground">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      const v = parseFloat(targetDraft)
+                      if (!isNaN(v) && v + 0.1 <= 100) setTargetDraft((v + 0.1).toFixed(1))
+                    }}
+                    className="w-8 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary flex items-center justify-center transition-colors"
+                    aria-label="0.1 증가"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
               ) : (
                 <p className="text-3xl font-bold text-foreground mt-1">{targetReturn}%</p>
               )}
-              <p className="text-xs text-muted-foreground mt-1">연간 운용 목표</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {editingTarget ? 'Enter로 저장 · Esc로 취소' : '연간 운용 목표'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -360,10 +390,10 @@ function CurrentPane() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Return trend */}
-        <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '150ms' }}>
+        <Card className="glass border-0 animate-slide-up">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
                   <LineIcon className="w-4 h-4 text-white" />
                 </div>
@@ -411,10 +441,10 @@ function CurrentPane() {
         </Card>
 
         {/* Portfolio */}
-        <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '200ms' }}>
+        <Card className="glass border-0 animate-slide-up">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-md">
                   <PieIcon className="w-4 h-4 text-white" />
                 </div>
@@ -562,7 +592,7 @@ function SimPane() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="glass border-0 bg-gradient-to-br from-primary/15 to-accent/5 animate-slide-up">
           <CardContent className="p-6 h-full flex flex-col justify-center">
-            <p className="text-xs text-muted-foreground mb-2">예상 연 수익률</p>
+            <p className="text-sm text-muted-foreground mb-2">예상 연 수익률</p>
             <div className="flex items-end gap-3 flex-wrap">
               <p className="text-5xl font-bold gradient-text leading-none">{expReturn}</p>
               <p className="text-sm text-muted-foreground leading-none pb-1">
@@ -573,9 +603,9 @@ function SimPane() {
           </CardContent>
         </Card>
 
-        <Card className="glass border-0 lg:col-span-2 animate-slide-up" style={{ animationDelay: '100ms' }}>
+        <Card className="glass border-0 lg:col-span-2 animate-slide-up">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-lg flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
                 <PieIcon className="w-4 h-4 text-white" />
               </div>
@@ -612,10 +642,10 @@ function SimPane() {
       </div>
 
       {/* Composition */}
-      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '150ms' }}>
+      <Card className="glass border-0 animate-slide-up">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-lg flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-md">
                 <SlidersHorizontal className="w-4 h-4 text-white" />
               </div>
@@ -644,15 +674,29 @@ function SimPane() {
           {(riskSum > 70 || concMsgs.length > 0) && (
             <div className="space-y-2 mb-4">
               {riskSum > 70 && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-100 text-red-500 text-xs font-medium">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  위험자산 비중이 법정 한도 70%를 초과했습니다 (현재 {riskSum}%)
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-red-50 to-rose-50/40 border border-red-200/60 shadow-sm animate-slide-up">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-500 to-rose-400 flex items-center justify-center shadow-md shrink-0">
+                    <AlertTriangle className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-red-600">위험자산 비중 한도 초과</p>
+                    <p className="text-xs text-red-500/80 mt-0.5">
+                      법정 한도 <span className="font-medium">70%</span> · 현재 <span className="font-semibold text-red-600">{riskSum}%</span>
+                    </p>
+                  </div>
                 </div>
               )}
               {concMsgs.length > 0 && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-100 text-amber-700 text-xs font-medium">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  분산투자 권장: {concMsgs.join(' · ')} → 2개 이상 상품 선택을 권장합니다
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-200/60 shadow-sm animate-slide-up">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-md shrink-0">
+                    <AlertTriangle className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-700">분산투자 권장</p>
+                    <p className="text-xs text-amber-600/80 mt-0.5">
+                      {concMsgs.join(' · ')} · 2개 이상 상품 선택을 권장합니다
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
