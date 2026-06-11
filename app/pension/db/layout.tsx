@@ -34,6 +34,8 @@ function DBSidebar() {
     ? 'deadlines'
     : pathname.endsWith('/documents')
     ? 'documents'
+    : pathname.endsWith('/assets')
+    ? 'assets'
     : 'overview'
 
   const handleTabChange = (tab: TabType) => {
@@ -41,5 +43,5 @@ function DBSidebar() {
     router.push(`/pension/db/${segment}`)
   }
 
-  return <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
+  return <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} planType="DB" />
 }

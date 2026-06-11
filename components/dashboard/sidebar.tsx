@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight } from 'lucide-react'
+import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight, Wallet } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { TabType } from '@/lib/types'
 import { useEffect, useState } from 'react'
@@ -8,22 +8,31 @@ import { useEffect, useState } from 'react'
 interface SidebarProps {
   activeTab: TabType
   setActiveTab: (tab: TabType) => void
+  planType?: string
 }
 
 interface CompanyInfo {
   companyName: string
   businessNumber: string
-  planType : string
+  planType: string
 }
 
-const menuItems = [
+const dcMenuItems = [
   { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
   { id: 'deadlines' as TabType, label: '기일 관리', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
 ]
 
-export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+const dbMenuItems = [
+  { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
+  { id: 'assets' as TabType, label: '자산 운용', icon: Wallet },
+  { id: 'members' as TabType, label: '가입자 관리', icon: Users },
+  { id: 'deadlines' as TabType, label: '기일 도래', icon: CalendarDays },
+  { id: 'documents' as TabType, label: '양서식', icon: FileText },
+]
+
+export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {
   const router = useRouter()
 
   // 기업 정보
@@ -126,7 +135,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       <nav className="flex-1 px-4 py-2">
         <p className="text-xs font-medium text-muted-foreground px-3 mb-3">메뉴</p>
         <ul className="space-y-1">
-          {menuItems.map((item) => {
+          {(planType === 'DB' ? dbMenuItems : dcMenuItems).map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
             return (
