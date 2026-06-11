@@ -118,18 +118,18 @@ export function DocumentForms() {
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(category.id)}
-                  className={`menu-item w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 text-left group active:scale-[0.99] ${
                     selectedCategory === category.id
-                      ? 'active bg-gradient-to-r from-primary to-accent text-white shadow-md'
-                      : 'text-muted-foreground hover:bg-white/50 hover:text-foreground'
+                      ? 'bg-gradient-to-r from-primary to-accent text-white shadow-md'
+                      : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
                   }`}
                   style={{ transitionDelay: `${idx * 30}ms` }}
                 >
                   <span className="font-medium">{category.name}</span>
-                  <span className={`text-sm px-2 py-0.5 rounded-md transition-all ${
+                  <span className={`text-sm px-2 py-0.5 rounded-md transition-all duration-200 ${
                     selectedCategory === category.id 
                       ? 'bg-white/20 text-white' 
-                      : 'bg-white/50 text-muted-foreground'
+                      : 'bg-white/50 text-muted-foreground group-hover:bg-primary/15 group-hover:text-primary'
                   }`}>
                     {category.count}
                   </span>
@@ -160,9 +160,7 @@ export function DocumentForms() {
                       <FileText className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      {/* 1. 배지와 제목의 정렬을 위해 items-start로 변경하는 것이 좋습니다 */}
                       <div className="flex items-start gap-2 justify-between">
-                        {/* 2. truncate를 제거하고 break-keep(단어 단위 줄바꿈)과 w-full 등을 적용 */}
                         <h3 className="font-semibold text-foreground break-keep whitespace-pre-wrap flex-1">
                           {doc.name}
                         </h3>
