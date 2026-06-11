@@ -20,7 +20,7 @@ interface CompanyInfo {
 const dcMenuItems = [
   { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
-  { id: 'deadlines' as TabType, label: '기일 관리', icon: CalendarDays },
+  { id: 'schedules' as TabType, label: '기일 관리', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
 ]
 
@@ -28,7 +28,7 @@ const dbMenuItems = [
   { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
   { id: 'assets' as TabType, label: '자산 운용', icon: Wallet },
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
-  { id: 'deadlines' as TabType, label: '기일 도래', icon: CalendarDays },
+  { id: 'schedules' as TabType, label: '기일 도래', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
 ]
 

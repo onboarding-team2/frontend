@@ -33,8 +33,8 @@ function DCSidebar() {
 
   const activeTab: TabType = pathname.includes('/members')
     ? 'members'
-    : pathname.endsWith('/deadlines')
-    ? 'deadlines'
+    : pathname.endsWith('/schedules')
+    ? 'schedules'
     : pathname.endsWith('/documents')
     ? 'documents'
     : 'overview'
