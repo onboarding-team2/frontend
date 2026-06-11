@@ -27,7 +27,7 @@ import {
 } from '@/lib/api'
 
 type ViewMode = 'list' | 'calendar'
-type FilterCategory = 'all' | 'imminent' | 'overdue'
+type FilterCategory = 'all' | 'completed' | 'imminent' | 'overdue'
 
 // ─── API 응답 → Schedule 변환 ─────────────────────────────────────
 
@@ -44,6 +44,7 @@ function convertDetailToSchedule(detail: ScheduleDcDetail): Schedule {
     priority: 'medium',
     status: detail.status === 'DONE' ? '완료' : detail.status === 'OVERDUE' ? '지연' : '예정',
     createdAt: detail.created_date || '',
+    required: detail.required,
     relatedSubscribers: hasEmployees
       ? detail.target_employees.map(e => ({
           id: String(e.employee_id),
@@ -211,7 +212,6 @@ function DetailModalContent({
       </div>
 
       <div className="space-y-4">
-        {/* 일정 내용 */}
         {schedule.content && (
           <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200/60 p-5">
             <div className="flex items-center gap-2 mb-3">
@@ -224,7 +224,6 @@ function DetailModalContent({
           </div>
         )}
 
-        {/* 연관 가입자 */}
         {schedule.relatedSubscribers && schedule.relatedSubscribers.length > 0 && (
           <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -256,7 +255,6 @@ function DetailModalContent({
           </div>
         )}
 
-        {/* 연관 기업 */}
         {schedule.relatedCompanies && schedule.relatedCompanies.length > 0 && (!schedule.relatedSubscribers || schedule.relatedSubscribers.length === 0) && (
           <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -323,7 +321,7 @@ function AddModalContent({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) { 
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowSubscriberDropdown(false);
       }
     };
@@ -396,7 +394,6 @@ function AddModalContent({
       </div>
 
       <div className="space-y-5">
-        {/* 기본 정보 */}
         <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/50 border border-slate-200/60 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -432,7 +429,6 @@ function AddModalContent({
           </div>
         </div>
 
-        {/* 일정 내용 */}
         <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200/60 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
@@ -455,7 +451,6 @@ function AddModalContent({
           </div>
         </div>
 
-        {/* 연관 가입자 검색/선택 */}
         <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5 space-y-4" ref={dropdownRef}>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
@@ -572,9 +567,10 @@ function CalendarView({
   onComplete: (id: string) => void
 }) {
   const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth() + 1)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [showAddForDate, setShowAddForDate] = useState<string | null>(null)
 
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -607,12 +603,13 @@ function CalendarView({
     return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' }
   }
 
-  const selectedDateSchedules = selectedDate ? schedules.filter(s => s.dueDate === selectedDate) : []
+  const selectedDateSchedules = schedules.filter(s => s.dueDate === selectedDate)
 
   const DAYS = ['일', '월', '화', '수', '목', '금', '토']
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* 월 이동 헤더 */}
       <div className="flex items-center justify-between">
         <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
           {year}년 {month}월
@@ -622,7 +619,7 @@ function CalendarView({
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
-            onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth() + 1) }}
+            onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth() + 1); setSelectedDate(todayStr) }}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
           >
             오늘
@@ -633,149 +630,150 @@ function CalendarView({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/60 overflow-hidden bg-white/60">
-        <div className="grid grid-cols-7 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/60">
-          {DAYS.map((d, i) => (
-            <div key={d} className={`py-3 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7">
-          {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-            <div key={`empty-${i}`} className="min-h-[90px] border-b border-r border-slate-100 bg-slate-50/30" />
-          ))}
-
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1
-            const daySchedules = getDateSchedules(day)
-            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-            const isToday = year === today.getFullYear() && month === today.getMonth() + 1 && day === today.getDate()
-            const isSelected = selectedDate === dateStr
-            const dayOfWeek = (firstDayOfWeek + i) % 7
-
-            return (
-              <div
-                key={day}
-                onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                className={`min-h-[90px] border-b border-r border-slate-100 p-2 cursor-pointer transition-all ${
-                  isSelected ? 'bg-blue-50/80' : 'hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className={`text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full transition-all ${
-                    isToday ? 'bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-sm' :
-                    dayOfWeek === 0 ? 'text-red-500' :
-                    dayOfWeek === 6 ? 'text-blue-500' : 'text-slate-700'
-                  }`}>
-                    {day}
-                  </span>
-                  {daySchedules.length > 0 && (
-                    <span className="text-xs font-bold text-blue-600 bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center">
-                      {daySchedules.length}
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  {daySchedules.slice(0, 2).map(s => {
-                    const color = getScheduleColor(s)
-                    return (
-                      <div
-                        key={s.id}
-                        onClick={e => { e.stopPropagation(); onViewDetail(s) }}
-                        className={`text-xs px-2 py-1 rounded-lg truncate cursor-pointer transition-all hover:scale-[1.02] ${color.bg} ${color.text} border ${color.border}`}
-                        title={s.title}
-                      >
-                        {s.title}
-                      </div>
-                    )
-                  })}
-                  {daySchedules.length > 2 && (
-                    <div className="text-xs text-slate-400 pl-1 font-medium">+{daySchedules.length - 2}개</div>
-                  )}
-                </div>
+      {/* 캘린더 + 사이드 패널 */}
+      <div className="flex gap-4">
+        {/* 캘린더 그리드 */}
+        <div className="flex-1 min-w-0 rounded-2xl border border-slate-200/60 overflow-hidden bg-white/60">
+          <div className="grid grid-cols-7 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/60">
+            {DAYS.map((d, i) => (
+              <div key={d} className={`py-3 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>
+                {d}
               </div>
-            )
-          })}
-        </div>
-      </div>
+            ))}
+          </div>
 
-      {selectedDate && (
-        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-5 animate-slide-up">
-          <div className="flex items-center justify-between mb-4">
+          <div className="grid grid-cols-7">
+            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+              <div key={`empty-${i}`} className="min-h-[90px] border-b border-r border-slate-100 bg-slate-50/30" />
+            ))}
+
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1
+              const daySchedules = getDateSchedules(day)
+              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+              const isToday = year === today.getFullYear() && month === today.getMonth() + 1 && day === today.getDate()
+              const isSelected = selectedDate === dateStr
+              const dayOfWeek = (firstDayOfWeek + i) % 7
+
+              return (
+                <div
+                  key={day}
+                  onClick={() => setSelectedDate(dateStr)}
+                  className={`min-h-[90px] border-b border-r border-slate-100 p-2 cursor-pointer transition-all ${
+                    isSelected ? 'bg-blue-50/80' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full transition-all ${
+                      isToday ? 'bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-sm' :
+                      dayOfWeek === 0 ? 'text-red-500' :
+                      dayOfWeek === 6 ? 'text-blue-500' : 'text-slate-700'
+                    }`}>
+                      {day}
+                    </span>
+                    {daySchedules.length > 0 && (
+                      <span className="text-xs font-bold text-blue-600 bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center">
+                        {daySchedules.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {daySchedules.slice(0, 2).map(s => {
+                      const color = getScheduleColor(s)
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={e => { e.stopPropagation(); onViewDetail(s) }}
+                          className={`text-xs px-2 py-1 rounded-lg truncate cursor-pointer transition-all hover:scale-[1.02] ${color.bg} ${color.text} border ${color.border}`}
+                          title={s.title}
+                        >
+                          {s.title}
+                        </div>
+                      )
+                    })}
+                    {daySchedules.length > 2 && (
+                      <div className="text-xs text-slate-400 pl-1 font-medium">+{daySchedules.length - 2}개</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 우측 날짜별 일정 패널 */}
+        <div className="w-[320px] flex-shrink-0 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-bold text-slate-800">
               {selectedDate} 기일 목록
               <span className="ml-2 text-xs font-medium text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full">{selectedDateSchedules.length}건</span>
             </h4>
             <button
               onClick={() => setShowAddForDate(selectedDate)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-md shadow-blue-500/20"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-md shadow-blue-500/20"
             >
-              <Plus className="w-4 h-4" />
-              일정 추가
+              <Plus className="w-3.5 h-3.5" />
+              추가
             </button>
           </div>
 
-          {selectedDateSchedules.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                <Calendar className="w-7 h-7 text-slate-300" />
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {selectedDateSchedules.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                  <Calendar className="w-6 h-6 text-slate-300" />
+                </div>
+                <p className="text-xs text-slate-400">이 날짜에 일정이 없습니다.</p>
+                <button
+                  onClick={() => setShowAddForDate(selectedDate)}
+                  className="mt-2 text-xs text-blue-600 font-medium hover:underline"
+                >
+                  일정 추가하기
+                </button>
               </div>
-              <p className="text-sm text-slate-400">이 날짜에 일정이 없습니다.</p>
-              <button
-                onClick={() => setShowAddForDate(selectedDate)}
-                className="mt-3 text-sm text-blue-600 font-medium hover:underline"
-              >
-                일정 추가하기
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {selectedDateSchedules.map(s => {
+            ) : (
+              selectedDateSchedules.map(s => {
                 const color = getScheduleColor(s)
                 const isCompleted = s.status === '완료'
                 return (
                   <div
                     key={s.id}
                     onClick={() => onViewDetail(s)}
-                    className={`flex items-center gap-3 p-4 rounded-xl bg-white/80 border transition-all hover:shadow-md cursor-pointer ${
+                    className={`flex items-center gap-2 p-3 rounded-xl bg-white/80 border transition-all hover:shadow-md cursor-pointer ${
                       isCompleted ? 'border-emerald-200 opacity-70' : 'border-slate-200'
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${color.bg}`}>
-                      <Calendar className={`w-5 h-5 ${color.text}`} />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm ${color.bg}`}>
+                      <Calendar className={`w-4 h-4 ${color.text}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-bold truncate ${isCompleted ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{s.title}</p>
+                      <p className={`text-xs font-bold truncate ${isCompleted ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{s.title}</p>
                     </div>
-                    <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                       {!isCompleted && (
                         <button
                           onClick={() => onComplete(s.id)}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
                           title="완료 처리"
                         >
-                          <CheckCircle2 className="w-4 h-4" />
+                          <CheckCircle2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                       <button
-                        onClick={() => {
-                          if (confirm(`"${s.title}" 일정을 삭제하시겠습니까?`)) onDelete(s.id)
-                        }}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
+                        onClick={() => onDelete(s.id)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
                         title="삭제"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
                 )
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
       <Modal open={!!showAddForDate} onClose={() => setShowAddForDate(null)}>
         <AddModalContent
@@ -818,6 +816,7 @@ export function ScheduleManagement() {
           priority: 'medium' as const,
           status: item.status === 'DONE' ? ('완료' as const) : item.status === 'OVERDUE' ? ('지연' as const) : ('예정' as const),
           createdAt: '',
+          required: item.required,
         }))
         setSchedules(items)
       })
@@ -833,7 +832,6 @@ export function ScheduleManagement() {
     try {
         const detail = await getScheduleDcDetail(id)
         const s = convertDetailToSchedule(detail)
-        // If no target subscribers and no company info returned, use current logged-in company
         if ((!s.relatedSubscribers || s.relatedSubscribers.length === 0) && (!s.relatedCompanies || s.relatedCompanies.length === 0)) {
           try {
             const cp = await getCompanyProfile()
@@ -870,10 +868,15 @@ export function ScheduleManagement() {
   }
 
   const handleDelete = async (id: string) => {
+    const schedule = schedules.find(s => s.id === id)
+    if (schedule?.required) {
+      setToast({ message: '필수 일정이므로 삭제 불가능합니다.', type: 'error' })
+      return
+    }
     try {
       await deleteScheduleDc(Number(id))
       setSchedules(prev => prev.filter(s => s.id !== id))
-      setToast({ message: '일정이 삭제되었습니다.', type: 'success' })
+      setToast({ message: '삭제되었습니다.', type: 'success' })
     } catch {
       setToast({ message: '일정 삭제에 실패했습니다.', type: 'error' })
     }
@@ -899,6 +902,7 @@ export function ScheduleManagement() {
     const activeSchedules = schedules.filter(s => s.status !== '완료')
     return {
       total: activeSchedules.length,
+      completed: schedules.filter(s => s.status === '완료').length,
       imminent: activeSchedules.filter(s => {
         const days = getDaysUntil(s.dueDate)
         return days >= 0 && days <= 14
@@ -907,8 +911,8 @@ export function ScheduleManagement() {
     }
   }, [schedules])
 
-  const filteredSchedules = useMemo(() => {
-    return schedules.filter(s => {
+  const { activeSchedules, completedSchedules } = useMemo(() => {
+    const active = schedules.filter(s => {
       if (s.status === '완료') return false
       const days = getDaysUntil(s.dueDate)
       const matchSearch = !searchQuery ||
@@ -920,6 +924,8 @@ export function ScheduleManagement() {
         matchCategory = days >= 0 && days <= 14
       } else if (filterCategory === 'overdue') {
         matchCategory = days < 0
+      } else if (filterCategory === 'completed') {
+        return false
       }
 
       return matchSearch && matchCategory
@@ -930,6 +936,17 @@ export function ScheduleManagement() {
       if (daysB < 0 && daysA >= 0) return 1
       return daysA - daysB
     })
+
+    const completed = schedules.filter(s => {
+      if (s.status !== '완료') return false
+      if (filterCategory !== 'all' && filterCategory !== 'completed') return false
+      const matchSearch = !searchQuery ||
+        s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.content.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchSearch
+    })
+
+    return { activeSchedules: active, completedSchedules: completed }
   }, [schedules, searchQuery, filterCategory])
 
   const getDaysLabel = (dueDate: string) => {
@@ -943,6 +960,72 @@ export function ScheduleManagement() {
   const formatDateShort = (dateStr: string) => {
     const d = new Date(dateStr)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const renderScheduleCard = (schedule: Schedule, isCompleted = false) => {
+    const daysInfo = getDaysLabel(schedule.dueDate)
+    const isOverdue = getDaysUntil(schedule.dueDate) < 0
+
+    return (
+      <div
+        key={schedule.id}
+        onClick={() => handleViewDetail(schedule)}
+        className={`glass rounded-2xl border transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer ${
+          isCompleted
+            ? 'border-emerald-200/70 bg-gradient-to-r from-emerald-50/30 to-green-50/20 opacity-80'
+            : isOverdue
+            ? 'border-red-200/70 bg-gradient-to-r from-red-50/50 to-rose-50/30'
+            : getDaysUntil(schedule.dueDate) <= 14
+            ? 'border-amber-200/70 bg-gradient-to-r from-amber-50/30 to-orange-50/20'
+            : 'border-border/50'
+        }`}
+      >
+        <div className="p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3">
+                {isCompleted && <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />}
+                <h4 className={`text-sm font-bold truncate ${isCompleted ? 'text-slate-400 line-through' : 'text-foreground'}`}>{schedule.title}</h4>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{formatDateShort(schedule.dueDate)}</span>
+                </div>
+              </div>
+            </div>
+
+            {!isCompleted && (
+              <span className={`text-sm font-bold px-3 py-1.5 rounded-lg ${daysInfo.color} ${daysInfo.bg} flex-shrink-0`}>
+                {daysInfo.label}
+              </span>
+            )}
+            {isCompleted && (
+              <span className="text-sm font-bold px-3 py-1.5 rounded-lg text-emerald-600 bg-emerald-50 flex-shrink-0">완료</span>
+            )}
+
+            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+              {!isCompleted && (
+                <button
+                  onClick={() => handleComplete(schedule.id)}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                  title="완료 처리"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={() => handleDelete(schedule.id)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
+                title="삭제"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -962,8 +1045,8 @@ export function ScheduleManagement() {
         </div>
       </div>
 
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* 통계 카드 - 4분할 */}
+      <div className="grid grid-cols-4 gap-4">
         <button
           onClick={() => setFilterCategory('all')}
           className={`glass rounded-2xl p-5 border transition-all hover:shadow-lg text-left ${
@@ -977,6 +1060,21 @@ export function ScheduleManagement() {
             <span className="text-sm font-medium text-muted-foreground">전체 건수</span>
           </div>
           <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{stats.total}</p>
+        </button>
+
+        <button
+          onClick={() => setFilterCategory('completed')}
+          className={`glass rounded-2xl p-5 border transition-all hover:shadow-lg text-left ${
+            filterCategory === 'completed' ? 'border-emerald-300 ring-2 ring-emerald-500/20' : 'border-emerald-200/50 bg-emerald-50/30'
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-md shadow-emerald-500/25">
+              <CheckCircle2 className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-sm font-medium text-muted-foreground">완료</span>
+          </div>
+          <p className="text-3xl font-bold text-emerald-600">{stats.completed}</p>
         </button>
 
         <button
@@ -1069,71 +1167,50 @@ export function ScheduleManagement() {
               </div>
               <p className="text-sm text-muted-foreground">일정을 불러오는 중...</p>
             </div>
-          ) : filteredSchedules.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                <Calendar className="w-8 h-8 text-slate-300" />
-              </div>
-              <p className="text-sm text-muted-foreground">조건에 맞는 일정이 없습니다.</p>
-            </div>
           ) : (
-            filteredSchedules.map(schedule => {
-              const daysInfo = getDaysLabel(schedule.dueDate)
-              const isOverdue = getDaysUntil(schedule.dueDate) < 0
-
-              return (
-                <div
-                  key={schedule.id}
-                  onClick={() => handleViewDetail(schedule)}
-                  className={`glass rounded-2xl border transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer ${
-                    isOverdue
-                      ? 'border-red-200/70 bg-gradient-to-r from-red-50/50 to-rose-50/30'
-                      : getDaysUntil(schedule.dueDate) <= 14
-                      ? 'border-amber-200/70 bg-gradient-to-r from-amber-50/30 to-orange-50/20'
-                      : 'border-border/50'
-                  }`}
-                >
-                  <div className="p-5">
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <h4 className="text-sm font-bold text-foreground truncate">{schedule.title}</h4>
-                        </div>
-                        <div className="flex items-center gap-3 mt-2">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{formatDateShort(schedule.dueDate)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <span className={`text-sm font-bold px-3 py-1.5 rounded-lg ${daysInfo.color} ${daysInfo.bg} flex-shrink-0`}>
-                        {daysInfo.label}
-                      </span>
-
-                      <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleComplete(schedule.id)}
-                          className="w-9 h-9 rounded-xl flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                          title="완료 처리"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`"${schedule.title}" 일정을 삭제하시겠습니까?`)) handleDelete(schedule.id)
-                          }}
-                          className="w-9 h-9 rounded-xl flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+            <>
+              {/* 진행중/미완료 섹션 */}
+              {filterCategory !== 'completed' && (
+                <>
+                  <div className="flex items-center gap-2 py-1">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">진행중 / 미완료</span>
+                    <div className="flex-1 h-px bg-slate-200" />
+                    <span className="text-xs text-slate-400">{activeSchedules.length}건</span>
                   </div>
+                  {activeSchedules.length === 0 ? (
+                    <div className="text-center py-10">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                        <Calendar className="w-7 h-7 text-slate-300" />
+                      </div>
+                      <p className="text-sm text-muted-foreground">조건에 맞는 일정이 없습니다.</p>
+                    </div>
+                  ) : (
+                    activeSchedules.map(s => renderScheduleCard(s, false))
+                  )}
+                </>
+              )}
+
+              {/* 완료된 일정 섹션 */}
+              {(filterCategory === 'all' || filterCategory === 'completed') && completedSchedules.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 py-1 mt-2">
+                    <span className="text-xs font-bold text-emerald-600 uppercase tracking-wide">완료된 일정</span>
+                    <div className="flex-1 h-px bg-emerald-200" />
+                    <span className="text-xs text-emerald-500">{completedSchedules.length}건</span>
+                  </div>
+                  {completedSchedules.map(s => renderScheduleCard(s, true))}
+                </>
+              )}
+
+              {filterCategory === 'completed' && completedSchedules.length === 0 && (
+                <div className="text-center py-10">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle2 className="w-7 h-7 text-slate-300" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">완료된 일정이 없습니다.</p>
                 </div>
-              )
-            })
+              )}
+            </>
           )}
         </div>
       )}
