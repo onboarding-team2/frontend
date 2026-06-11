@@ -578,15 +578,15 @@ function SimPane() {
               const splitTxt = cls.multi && selProds.length > 1 ? ` · ${selProds.length}개 분산 (각 ${(w / selProds.length).toFixed(1)}%)` : ''
               return (
                 <div key={key} className="rounded-xl border border-white/50 bg-white/40 p-3">
-                  <div className="grid grid-cols-[minmax(110px,140px)_1fr_auto] items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="grid grid-cols-[minmax(110px,140px)_1fr_auto] items-start gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground pt-1">
                       <span className="w-2.5 h-2.5 rounded shrink-0" style={{ background: cls.color }} />
                       {cls.name}
                       {cls.risk && (
                         <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-red-100 text-red-500">위험</span>
                       )}
                     </div>
-                    <div className="relative w-full">
+                    <div className="relative w-full pb-3.5">
                       <input
                         type="range"
                         min={0}
@@ -598,63 +598,67 @@ function SimPane() {
                         className="cd-slider"
                         style={{ '--val': `${w}%`, '--color': cls.color } as CSSProperties}
                       />
-                      <div className="flex justify-between px-0.5 mt-0.5">
+                      <div className="absolute bottom-0 left-0.5 right-0.5 flex justify-between">
                         {[0, 25, 50, 75, 100].map((t) => (
                           <span key={t} className="text-[9px] text-muted-foreground">{t}</span>
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 justify-end">
+                    <div className="flex items-center gap-3 justify-end pt-1">
                       <span className="text-sm font-semibold text-foreground w-9 text-right">{w}%</span>
                       <span className="text-xs text-muted-foreground w-16 text-right">{cRet !== null ? `적용 ${cRet.toFixed(1)}%` : '—'}</span>
                     </div>
                   </div>
 
-                  {w > 0 && (
-                    <div className="mt-3 pt-3 border-t border-white/50">
-                      <button onClick={() => toggleOpen(key)} className="w-full flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="text-left">{selNames}{splitTxt}</span>
-                        <span className="flex items-center gap-1 text-primary font-medium shrink-0 ml-2">
-                          {isOpen ? '접기' : '상품 변경'}
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                        </span>
-                      </button>
+                  <div className="mt-3 pt-3 border-t border-white/50">
+                    {w === 0 ? (
+                      <p className="text-xs text-muted-foreground">{cls.name} 상품의 비중이 0입니다.</p>
+                    ) : (
+                      <>
+                        <button onClick={() => toggleOpen(key)} className="w-full flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="text-left">{selNames}{splitTxt}</span>
+                          <span className="flex items-center gap-1 text-primary font-medium shrink-0 ml-2">
+                            {isOpen ? '접기' : '상품 변경'}
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                          </span>
+                        </button>
 
-                      {isOpen && (
-                        <div className="mt-2 space-y-0.5">
-                          {cls.products.map((p) => {
-                            const checked = sel.includes(p.id)
-                            return (
-                              <label key={p.id} className="flex items-center gap-2.5 py-1.5 text-xs border-b border-white/40 last:border-0 cursor-pointer">
-                                <input
-                                  type={cls.multi ? 'checkbox' : 'radio'}
-                                  name={`sel-${key}`}
-                                  checked={checked}
-                                  onChange={() => toggleProd(key, p.id, cls.multi)}
-                                  className="w-3.5 h-3.5 accent-primary cursor-pointer shrink-0"
-                                />
-                                <span className="flex-1 text-foreground">{p.name}</span>
-                                {p.tag && (
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                    p.tag === '수익률 1위' ? 'bg-primary/15 text-primary' : 'bg-white/60 text-muted-foreground'
-                                  }`}>
-                                    {p.tag}
-                                  </span>
-                                )}
-                                <span className="w-12 text-right font-semibold text-emerald-600">+{p.ret.toFixed(1)}%</span>
-                              </label>
-                            )
-                          })}
-                          {cls.multi && (
-                            <p className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1.5">
-                              <Info className="w-3 h-3" />
-                              복수 선택 시 자산군 비중을 균등 분산합니다
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        {isOpen && (
+                          <div className="mt-2 space-y-0.5">
+                            {cls.products.map((p) => {
+                              const checked = sel.includes(p.id)
+                              return (
+                                <label key={p.id} className="flex items-center gap-2.5 py-1.5 text-xs border-b border-white/40 last:border-0 cursor-pointer">
+                                  <input
+                                    type={cls.multi ? 'checkbox' : 'radio'}
+                                    name={`sel-${key}`}
+                                    checked={checked}
+                                    onChange={() => toggleProd(key, p.id, cls.multi)}
+                                    className="w-3.5 h-3.5 accent-primary cursor-pointer shrink-0"
+                                  />
+                                  <span className="flex-1 text-foreground">{p.name}</span>
+                                  {p.tag && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                      p.tag === '수익률 1위' ? 'bg-primary/15 text-primary' : 'bg-white/60 text-muted-foreground'
+                                    }`}>
+                                      {p.tag}
+                                    </span>
+                                  )}
+                                  <span className="w-12 text-right font-semibold text-emerald-600">+{p.ret.toFixed(1)}%</span>
+                                </label>
+                              )
+                            })}
+                            {cls.multi && (
+                              <p className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1.5">
+                                <Info className="w-3 h-3" />
+                                복수 선택 시 자산군 비중을 균등 분산합니다
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               )
             })}
