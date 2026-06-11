@@ -32,6 +32,7 @@ export interface Schedule {
   status: ScheduleStatus
   createdAt: string
   memo?: string
+  required?: boolean
   relatedCompanies?: RelatedCompany[]
   relatedSubscribers?: RelatedSubscriber[]
 }
