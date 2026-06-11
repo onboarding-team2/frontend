@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import {
   Schedule,
   TargetType,
-} from '@/lib/deadline-data'
+} from '@/lib/schedule-data'
 import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
 import {
   Employee,
@@ -22,20 +22,21 @@ import {
   deleteScheduleDb,
   completeScheduleDb,
   getPensionMemberDetail,
+  getCompanyProfile,
 } from '@/lib/api'
 
 type ViewMode = 'list' | 'calendar'
 type FilterCategory = 'all' | 'imminent' | 'overdue'
 
-// ─── API 응답 → DeadlineSchedule 변환 ─────────────────────────────────────
+// ─── API 응답 → Schedule 변환 ─────────────────────────────────────
 
-function convertDetailToSchedule(detail: ScheduleDbDetail): DeadlineSchedule {
+function convertDetailToSchedule(detail: ScheduleDbDetail): Schedule {
   const hasEmployees = detail.target_employees && detail.target_employees.length > 0
 
   return {
     id: String(detail.id),
     title: detail.title,
-    deadline: detail.due_date,
+    dueDate: detail.due_date,
     content: detail.description || '',
     type: 'DB',
     targetType: hasEmployees ? '가입자' : ('기업' as TargetType),
@@ -52,6 +53,16 @@ function convertDetailToSchedule(detail: ScheduleDbDetail): DeadlineSchedule {
           balance: 0,
         }))
       : undefined,
+    relatedCompanies: !hasEmployees && detail.company_name ? [
+      {
+        id: String(detail.company_name),
+        name: detail.company_name,
+        businessNumber: detail.brn || '',
+        employeeCount: 0,
+        planType: (detail.plan_type as 'DC' | 'DB') ?? 'DB',
+        contractDate: '',
+      }
+    ] : undefined,
   }
 }
 
@@ -115,7 +126,7 @@ function DetailModalContent({
   onClose,
   onSubscriberClick,
 }: {
-  schedule: DeadlineSchedule
+  schedule: Schedule
   onClose: () => void
   onSubscriberClick: (sub: SubscriberDetail) => void
 }) {
@@ -251,7 +262,7 @@ function DetailModalContent({
               <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-blue-600" />
               </div>
-              <span className="text-sm font-bold text-slate-800">기업 대상</span>
+              <span className="text-sm font-bold text-slate-800">대상 기업</span>
             </div>
             <div className="space-y-2">
               {schedule.relatedCompanies.map(company => (
@@ -334,7 +345,7 @@ function AddModalContent({
     try {
       await onAdd(
         form.title,
-        form.deadline,
+        form.dueDate,
         form.content,
         selectedSubscribers.map(m => m.id),
       )
@@ -542,7 +553,7 @@ function CalendarView({
   onViewDetail,
   onComplete,
 }: {
-  schedules: DeadlineSchedule[]
+  schedules: Schedule[]
   onAdd: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
   onDelete: (id: string) => void
   onViewDetail: (s: Schedule) => void
@@ -577,7 +588,7 @@ function CalendarView({
     return schedules.filter(s => s.dueDate === dateStr)
   }
 
-  const getScheduleColor = (s: DeadlineSchedule) => {
+  const getScheduleColor = (s: Schedule) => {
     if (s.status === '완료') return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' }
     const days = getDaysUntil(s.dueDate)
     if (days < 0) return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' }
@@ -770,8 +781,8 @@ function CalendarView({
 /* ─────────────────────────────────────────────
    메인 컴포넌트
 ───────────────────────────────────────────── */
-export function DeadlineAlerts() {
-  const [schedules, setSchedules] = useState<DeadlineSchedule[]>([])
+export function ScheduleManagement() {
+  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
@@ -788,7 +799,7 @@ export function DeadlineAlerts() {
         const items = res.schedules.map(item => ({
           id: String(item.id),
           title: item.title,
-          deadline: item.due_date,
+          dueDate: item.due_date,
           content: '',
           type: 'DB' as const,
           targetType: '기업' as TargetType,
@@ -803,13 +814,32 @@ export function DeadlineAlerts() {
     return () => controller.abort()
   }, [])
 
-  const handleViewDetail = async (schedule: DeadlineSchedule) => {
+  const handleViewDetail = async (schedule: Schedule) => {
     setSelectedSchedule(schedule)
     const id = Number(schedule.id)
     if (isNaN(id)) return
     try {
-      const detail = await getScheduleDbDetail(id)
-      setSelectedSchedule(convertDetailToSchedule(detail))
+        const detail = await getScheduleDbDetail(id)
+        const s = convertDetailToSchedule(detail)
+        // If no target subscribers and no company info returned, use current logged-in company
+        if ((!s.relatedSubscribers || s.relatedSubscribers.length === 0) && (!s.relatedCompanies || s.relatedCompanies.length === 0)) {
+          try {
+            const cp = await getCompanyProfile()
+            s.relatedCompanies = [
+              {
+                id: String(cp.companyName),
+                name: cp.companyName,
+                businessNumber: cp.businessNumber,
+                employeeCount: 0,
+                planType: (cp.planType as 'DC' | 'DB') ?? 'DB',
+                contractDate: '',
+              }
+            ]
+          } catch {
+            // ignore
+          }
+        }
+        setSelectedSchedule(s)
     } catch {
       // 기본 데이터로 유지
     }
@@ -847,7 +877,7 @@ export function DeadlineAlerts() {
     }
   }
 
-  const getDaysUntil = (deadline: string) => {
+  const getDaysUntil = (dueDate: string) => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const d = new Date(dueDate)
     return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
@@ -868,7 +898,7 @@ export function DeadlineAlerts() {
   const filteredSchedules = useMemo(() => {
     return schedules.filter(s => {
       if (s.status === '완료') return false
-      const days = getDaysUntil(s.deadline)
+      const days = getDaysUntil(s.dueDate)
       const matchSearch = !searchQuery ||
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.content.toLowerCase().includes(searchQuery.toLowerCase())
@@ -882,8 +912,8 @@ export function DeadlineAlerts() {
 
       return matchSearch && matchCategory
     }).sort((a, b) => {
-      const daysA = getDaysUntil(a.deadline)
-      const daysB = getDaysUntil(b.deadline)
+      const daysA = getDaysUntil(a.dueDate)
+      const daysB = getDaysUntil(b.dueDate)
       if (daysA < 0 && daysB >= 0) return -1
       if (daysB < 0 && daysA >= 0) return 1
       return daysA - daysB

@@ -185,7 +185,7 @@ export function getSchedulesByDate(schedules: Schedule[], dateStr: string): Sche
   return schedules.filter(s => s.dueDate === dateStr)
 }
 
-export function getDaysUntilDeadline(dueDate: string): number {
+export function getDaysUntilDueDate(dueDate: string): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const d = new Date(dueDate)
