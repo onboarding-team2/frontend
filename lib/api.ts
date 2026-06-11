@@ -53,6 +53,22 @@ async function pensionFetch(path: string, signal?: AbortSignal): Promise<unknown
   return res.json()
 }
 
+export type CompanyProfile = {
+  companyName: string
+  businessNumber: string
+  planType: string
+}
+
+export async function getCompanyProfile(signal?: AbortSignal): Promise<CompanyProfile> {
+  const res = await fetch(`${API_BASE}/company/profile`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '기업 정보 조회 실패'))
+  return res.json()
+}
+
 export async function getPensionDashboard(signal?: AbortSignal): Promise<DcDashboard> {
   const r = await pensionFetch('/dashboard', signal) as Record<string, unknown>
   return {
@@ -154,8 +170,8 @@ export async function getDcMembers(signal?: AbortSignal): Promise<Employee[]> {
   return (await fetchMemberPage('dc', { size: 100000 }, signal)).members
 }
 
-export async function getPensionDeadlines(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
-  return pensionFetch('/deadlines', signal) as Promise<ExpectedRetiree[]>
+export async function getPensionSchedules(signal?: AbortSignal): Promise<ExpectedRetiree[]> {
+  return pensionFetch('/schedules', signal) as Promise<ExpectedRetiree[]>
 }
 
 export async function getPensionDocuments(signal?: AbortSignal): Promise<unknown> {
@@ -307,7 +323,7 @@ export async function getSchedulesDc(
   if (params?.period != null) qs.set('period', String(params.period))
   if (params?.keyword) qs.set('keyword', params.keyword)
   const query = qs.toString()
-  const res = await fetch(`${API_BASE}/schedules${query ? '?' + query : ''}`, {
+  const res = await fetch(`${API_BASE}/dc/schedules${query ? '?' + query : ''}`, {
     headers: authHeaders(),
     cache: 'no-store',
     signal,
@@ -317,7 +333,7 @@ export async function getSchedulesDc(
 }
 
 export async function getScheduleDcDetail(id: number, signal?: AbortSignal): Promise<ScheduleDcDetail> {
-  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+  const res = await fetch(`${API_BASE}/dc/schedules/${id}`, {
     headers: authHeaders(),
     cache: 'no-store',
     signal,
@@ -332,7 +348,7 @@ export async function createScheduleDc(data: {
   description?: string
   employee_ids?: number[]
 }): Promise<ScheduleDcDetail> {
-  const res = await fetch(`${API_BASE}/schedules`, {
+  const res = await fetch(`${API_BASE}/dc/schedules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
     body: JSON.stringify(data),
@@ -342,7 +358,7 @@ export async function createScheduleDc(data: {
 }
 
 export async function deleteScheduleDc(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+  const res = await fetch(`${API_BASE}/dc/schedules/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   })
@@ -350,7 +366,7 @@ export async function deleteScheduleDc(id: number): Promise<void> {
 }
 
 export async function completeScheduleDc(id: number): Promise<ScheduleDcDetail> {
-  const res = await fetch(`${API_BASE}/schedules/${id}/complete`, {
+  const res = await fetch(`${API_BASE}/dc/schedules/${id}/complete`, {
     method: 'PATCH',
     headers: authHeaders(),
   })
@@ -434,7 +450,7 @@ export async function getSchedulesDb(
   if (params?.period != null) qs.set('period', String(params.period))
   if (params?.keyword) qs.set('keyword', params.keyword)
   const query = qs.toString()
-  const res = await fetch(`${API_BASE}/schedules/db${query ? '?' + query : ''}`, {
+  const res = await fetch(`${API_BASE}/db/schedules${query ? '?' + query : ''}`, {
     headers: authHeaders(),
     cache: 'no-store',
     signal,
@@ -444,7 +460,7 @@ export async function getSchedulesDb(
 }
 
 export async function getScheduleDbDetail(id: number, signal?: AbortSignal): Promise<ScheduleDbDetail> {
-  const res = await fetch(`${API_BASE}/schedules/db/${id}`, {
+  const res = await fetch(`${API_BASE}/db/schedules/${id}`, {
     headers: authHeaders(),
     cache: 'no-store',
     signal,
@@ -459,7 +475,7 @@ export async function createScheduleDb(data: {
   description?: string
   employee_ids?: number[]
 }): Promise<ScheduleDbDetail> {
-  const res = await fetch(`${API_BASE}/schedules/db`, {
+  const res = await fetch(`${API_BASE}/db/schedules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
     body: JSON.stringify(data),
@@ -469,7 +485,7 @@ export async function createScheduleDb(data: {
 }
 
 export async function deleteScheduleDb(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/schedules/db/${id}`, {
+  const res = await fetch(`${API_BASE}/db/schedules/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   })
@@ -477,7 +493,7 @@ export async function deleteScheduleDb(id: number): Promise<void> {
 }
 
 export async function completeScheduleDb(id: number): Promise<ScheduleDbDetail> {
-  const res = await fetch(`${API_BASE}/schedules/db/${id}/complete`, {
+  const res = await fetch(`${API_BASE}/db/schedules/${id}/complete`, {
     method: 'PATCH',
     headers: authHeaders(),
   })

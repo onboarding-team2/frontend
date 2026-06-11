@@ -8,9 +8,9 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  DeadlineSchedule,
+  Schedule,
   TargetType,
-} from '@/lib/deadline-data'
+} from '@/lib/schedule-data'
 import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
 import {
   Employee,
@@ -22,24 +22,25 @@ import {
   deleteScheduleDc,
   completeScheduleDc,
   getDcMemberDetail,
+  getCompanyProfile,
 } from '@/lib/api'
 
 type ViewMode = 'list' | 'calendar'
 type FilterCategory = 'all' | 'imminent' | 'overdue'
 
-// ─── API 응답 → DeadlineSchedule 변환 ─────────────────────────────────────
+// ─── API 응답 → Schedule 변환 ─────────────────────────────────────
 
-function convertDetailToSchedule(detail: ScheduleDcDetail): DeadlineSchedule {
+function convertDetailToSchedule(detail: ScheduleDcDetail): Schedule {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const deadline = new Date(detail.due_date)
-  const isOverdue = deadline < today && detail.status !== '완료'
+  const dueDate = new Date(detail.due_date)
+  const isOverdue = dueDate < today && detail.status !== '완료'
   const hasEmployees = detail.target_employees && detail.target_employees.length > 0
 
   return {
     id: String(detail.id),
     title: detail.title,
-    deadline: detail.due_date,
+    dueDate: detail.due_date,
     content: detail.description || '',
     type: 'DC',
     targetType: hasEmployees ? '가입자' : ('기업' as TargetType),
@@ -56,6 +57,16 @@ function convertDetailToSchedule(detail: ScheduleDcDetail): DeadlineSchedule {
           balance: 0,
         }))
       : undefined,
+    relatedCompanies: !hasEmployees && detail.company_name ? [
+      {
+        id: String(detail.company_name),
+        name: detail.company_name,
+        businessNumber: detail.brn || '',
+        employeeCount: 0,
+        planType: (detail.plan_type as 'DC' | 'DB') ?? 'DC',
+        contractDate: '',
+      }
+    ] : undefined,
   }
 }
 
@@ -119,13 +130,13 @@ function DetailModalContent({
   onClose,
   onSubscriberClick,
 }: {
-  schedule: DeadlineSchedule
+  schedule: Schedule
   onClose: () => void
   onSubscriberClick: (sub: SubscriberDetail) => void
 }) {
   const getDays = () => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
-    const d = new Date(schedule.deadline)
+    const d = new Date(schedule.dueDate)
     return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   }
   const days = getDays()
@@ -135,14 +146,14 @@ function DetailModalContent({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  const getDeadlineText = () => {
+  const getScheduleText = () => {
     if (schedule.status === '완료') return '처리 완료'
     if (days < 0) return `${Math.abs(days)}일 초과`
     if (days === 0) return '오늘 마감'
     return `${days}일 전`
   }
 
-  const getDeadlineColor = () => {
+  const getScheduleColor = () => {
     if (schedule.status === '완료') return 'text-emerald-600'
     if (days < 0) return 'text-red-600'
     if (days <= 14) return 'text-amber-600'
@@ -191,8 +202,8 @@ function DetailModalContent({
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold text-slate-900 leading-tight mb-0.5">{schedule.title}</h2>
-            <p className={`text-sm font-semibold ${getDeadlineColor()}`}>
-              기한: {formatDateShort(schedule.deadline)} ({getDeadlineText()})
+            <p className={`text-sm font-semibold ${getScheduleColor()}`}>
+              기한: {formatDateShort(schedule.dueDate)} ({getScheduleText()})
             </p>
           </div>
         </div>
@@ -256,7 +267,7 @@ function DetailModalContent({
               <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-blue-600" />
               </div>
-              <span className="text-sm font-bold text-slate-800">기업 대상</span>
+              <span className="text-sm font-bold text-slate-800">대상 기업</span>
             </div>
             <div className="space-y-2">
               {schedule.relatedCompanies.map(company => (
@@ -301,7 +312,7 @@ function AddModalContent({
 }) {
   const [form, setForm] = useState({
     title: '',
-    deadline: defaultDate || '',
+    dueDate: defaultDate || '',
     content: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -327,7 +338,7 @@ function AddModalContent({
   const validate = () => {
     const e: Record<string, string> = {}
     if (!form.title.trim()) e.title = '일정 타이틀을 입력해주세요.'
-    if (!form.deadline) e.deadline = '기한을 선택해주세요.'
+    if (!form.dueDate) e.dueDate = '기한을 선택해주세요.'
     if (!form.content.trim()) e.content = '일정 내용을 입력해주세요.'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -339,7 +350,7 @@ function AddModalContent({
     try {
       await onAdd(
         form.title,
-        form.deadline,
+        form.dueDate,
         form.content,
         selectedSubscribers.map(m => m.id),
       )
@@ -406,11 +417,11 @@ function AddModalContent({
             </label>
             <input
               type="date"
-              className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.deadline ? 'border-red-400' : 'border-slate-200'}`}
-              value={form.deadline}
-              onChange={e => f('deadline', e.target.value)}
+              className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.dueDate ? 'border-red-400' : 'border-slate-200'}`}
+              value={form.dueDate}
+              onChange={e => f('dueDate', e.target.value)}
             />
-            {errors.deadline && <p className="text-xs text-red-500 mt-1.5">{errors.deadline}</p>}
+            {errors.dueDate && <p className="text-xs text-red-500 mt-1.5">{errors.dueDate}</p>}
           </div>
         </div>
 
@@ -547,10 +558,10 @@ function CalendarView({
   onViewDetail,
   onComplete,
 }: {
-  schedules: DeadlineSchedule[]
+  schedules: Schedule[]
   onAdd: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
   onDelete: (id: string) => void
-  onViewDetail: (s: DeadlineSchedule) => void
+  onViewDetail: (s: Schedule) => void
   onComplete: (id: string) => void
 }) {
   const today = new Date()
@@ -571,25 +582,25 @@ function CalendarView({
     else setMonth(m => m + 1)
   }
 
-  const getDaysUntil = (deadline: string) => {
+  const getDaysUntil = (dueDate: string) => {
     const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0)
-    const d = new Date(deadline)
+    const d = new Date(dueDate)
     return Math.round((d.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
   }
 
   const getDateSchedules = (day: number) => {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return schedules.filter(s => s.deadline === dateStr)
+    return schedules.filter(s => s.dueDate === dateStr)
   }
 
-  const getScheduleColor = (s: DeadlineSchedule) => {
+  const getScheduleColor = (s: Schedule) => {
     if (s.status === '완료') return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' }
-    const days = getDaysUntil(s.deadline)
+    const days = getDaysUntil(s.dueDate)
     if (days < 0) return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' }
     return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' }
   }
 
-  const selectedDateSchedules = selectedDate ? schedules.filter(s => s.deadline === selectedDate) : []
+  const selectedDateSchedules = selectedDate ? schedules.filter(s => s.dueDate === selectedDate) : []
 
   const DAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -775,11 +786,11 @@ function CalendarView({
 /* ─────────────────────────────────────────────
    메인 컴포넌트
 ───────────────────────────────────────────── */
-export function DeadlineAlerts() {
-  const [schedules, setSchedules] = useState<DeadlineSchedule[]>([])
+export function ScheduleManagement() {
+  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [selectedSchedule, setSelectedSchedule] = useState<DeadlineSchedule | null>(null)
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
@@ -793,12 +804,12 @@ export function DeadlineAlerts() {
       .then(res => {
         const items = res.schedules.map(item => {
           const today = new Date(); today.setHours(0, 0, 0, 0)
-          const deadline = new Date(item.due_date)
-          const isOverdue = deadline < today && item.status !== '완료'
+          const dueDate = new Date(item.due_date)
+          const isOverdue = dueDate < today && item.status !== '완료'
           return {
             id: String(item.id),
             title: item.title,
-            deadline: item.due_date,
+            dueDate: item.due_date,
             content: '',
             type: 'DC' as const,
             targetType: '기업' as TargetType,
@@ -815,14 +826,35 @@ export function DeadlineAlerts() {
   }, [])
 
   // 일정 클릭 시 상세 정보 fetch
-  const handleViewDetail = async (schedule: DeadlineSchedule) => {
+  const handleViewDetail = async (schedule: Schedule) => {
     setSelectedSchedule(schedule)
     const id = Number(schedule.id)
     if (isNaN(id)) return
     try {
+      console.log('[DC schedule] fetching detail', id)
       const detail = await getScheduleDcDetail(id)
-      setSelectedSchedule(convertDetailToSchedule(detail))
-    } catch {
+      console.log('[DC schedule] detail response', detail)
+      const converted = convertDetailToSchedule(detail)
+      if ((!converted.relatedSubscribers || converted.relatedSubscribers.length === 0) && (!converted.relatedCompanies || converted.relatedCompanies.length === 0)) {
+        try {
+          const cp = await getCompanyProfile()
+          converted.relatedCompanies = [
+            {
+              id: String(cp.companyName),
+              name: cp.companyName,
+              businessNumber: cp.businessNumber,
+              employeeCount: 0,
+              planType: (cp.planType as 'DC' | 'DB') ?? 'DC',
+              contractDate: '',
+            },
+          ]
+        } catch (error) {
+          console.warn('[DC schedule] company profile fallback failed', error)
+        }
+      }
+      setSelectedSchedule(converted)
+    } catch (error) {
+      console.warn('[DC schedule] detail fetch failed', error)
       // 기본 데이터로 유지
     }
   }
@@ -859,9 +891,9 @@ export function DeadlineAlerts() {
     }
   }
 
-  const getDaysUntil = (deadline: string) => {
+  const getDaysUntil = (dueDate: string) => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
-    const d = new Date(deadline)
+    const d = new Date(dueDate)
     return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   }
 
@@ -870,17 +902,17 @@ export function DeadlineAlerts() {
     return {
       total: activeSchedules.length,
       imminent: activeSchedules.filter(s => {
-        const days = getDaysUntil(s.deadline)
+        const days = getDaysUntil(s.dueDate)
         return days >= 0 && days <= 14
       }).length,
-      overdue: activeSchedules.filter(s => getDaysUntil(s.deadline) < 0).length,
+      overdue: activeSchedules.filter(s => getDaysUntil(s.dueDate) < 0).length,
     }
   }, [schedules])
 
   const filteredSchedules = useMemo(() => {
     return schedules.filter(s => {
       if (s.status === '완료') return false
-      const days = getDaysUntil(s.deadline)
+      const days = getDaysUntil(s.dueDate)
       const matchSearch = !searchQuery ||
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.content.toLowerCase().includes(searchQuery.toLowerCase())
@@ -894,16 +926,16 @@ export function DeadlineAlerts() {
 
       return matchSearch && matchCategory
     }).sort((a, b) => {
-      const daysA = getDaysUntil(a.deadline)
-      const daysB = getDaysUntil(b.deadline)
+      const daysA = getDaysUntil(a.dueDate)
+      const daysB = getDaysUntil(b.dueDate)
       if (daysA < 0 && daysB >= 0) return -1
       if (daysB < 0 && daysA >= 0) return 1
       return daysA - daysB
     })
   }, [schedules, searchQuery, filterCategory])
 
-  const getDaysLabel = (deadline: string) => {
-    const days = getDaysUntil(deadline)
+  const getDaysLabel = (dueDate: string) => {
+    const days = getDaysUntil(dueDate)
     if (days < 0) return { label: `${Math.abs(days)}일 초과`, color: 'text-red-600', bg: 'bg-red-50' }
     if (days === 0) return { label: '오늘 마감', color: 'text-red-600', bg: 'bg-red-50' }
     if (days <= 14) return { label: `D-${days}`, color: 'text-amber-600', bg: 'bg-amber-50' }
@@ -1048,8 +1080,8 @@ export function DeadlineAlerts() {
             </div>
           ) : (
             filteredSchedules.map(schedule => {
-              const daysInfo = getDaysLabel(schedule.deadline)
-              const isOverdue = getDaysUntil(schedule.deadline) < 0
+              const daysInfo = getDaysLabel(schedule.dueDate)
+              const isOverdue = getDaysUntil(schedule.dueDate) < 0
 
               return (
                 <div
@@ -1058,7 +1090,7 @@ export function DeadlineAlerts() {
                   className={`glass rounded-2xl border transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer ${
                     isOverdue
                       ? 'border-red-200/70 bg-gradient-to-r from-red-50/50 to-rose-50/30'
-                      : getDaysUntil(schedule.deadline) <= 14
+                      : getDaysUntil(schedule.dueDate) <= 14
                       ? 'border-amber-200/70 bg-gradient-to-r from-amber-50/30 to-orange-50/20'
                       : 'border-border/50'
                   }`}
@@ -1072,7 +1104,7 @@ export function DeadlineAlerts() {
                         <div className="flex items-center gap-3 mt-2">
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>{formatDateShort(schedule.deadline)}</span>
+                            <span>{formatDateShort(schedule.dueDate)}</span>
                           </div>
                         </div>
                       </div>
