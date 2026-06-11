@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo, type CSSProperties } from 'react'
+import { useState, useMemo, useEffect, useRef, type CSSProperties } from 'react'
+import { getDbDashboard, type DbDashboard } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   LineChart,
@@ -30,6 +31,12 @@ import {
   Pencil,
   Minus,
   Plus,
+  Save,
+  FolderOpen,
+  Trash2,
+  Check,
+  X,
+
 } from 'lucide-react'
 
 type SubTab = 'current' | 'sim'
@@ -89,9 +96,62 @@ type PeriodKey = keyof typeof periods
 const CURRENT_RETURN = 4.2
 
 const portfolio = [
-  { name: '원리금보장형', pct: 72, amt: '30.7억', color: '#2563eb' },
+  // { name: '원리금보장형', pct: 72, amt: '30.7억', color: '#2563eb', products: ['IBK 정기예금 1년', 'ELB 지수연계형'] },
+  // { name: '실적배당형', pct: 21, amt: '9.0억', color: '#0ea5e9', products: ['TIGER 미국나스닥100', 'KODEX 미국S&P500TR'] },
+  // { name: '채권형', pct: 7, amt: '3.0억', color: '#94a3b8', products: ['KODEX 28-12 회사채(AA-)'] },
+    { name: '원리금보장형', pct: 72, amt: '30.7억', color: '#2563eb' },
   { name: '실적배당형', pct: 21, amt: '9.0억', color: '#0ea5e9' },
   { name: '채권형', pct: 7, amt: '3.0억', color: '#94a3b8' },
+]
+
+/* 자산 유형별 실제 운용 상품 (investment_product_master · asset_class_master 기준) */
+const holdings: {
+  className: string
+  color: string
+  items: { product: string; provider: string; ret: number; amt: string }[]
+}[] = [
+  {
+    className: '원리금보장형',
+    color: '#2563eb',
+    items: [
+      { product: 'IBK 정기예금 1년', provider: 'IBK기업은행', ret: 3.6, amt: '18.0억' },
+      { product: 'IBK GIC 2년', provider: 'IBK기업은행', ret: 3.4, amt: '8.7억' },
+      { product: 'ELB 지수연계형', provider: '미래에셋증권', ret: 4.1, amt: '4.0억' },
+    ],
+  },
+  {
+    className: '채권형',
+    color: '#94a3b8',
+    items: [
+      { product: 'KODEX 28-12 회사채(AA-)', provider: '삼성자산운용', ret: 5.8, amt: '1.8억' },
+      { product: 'ACE 국고채10년', provider: '한국투자신탁운용', ret: 4.9, amt: '1.2억' },
+    ],
+  },
+  {
+    className: '혼합형·TDF',
+    color: '#14b8a6',
+    items: [
+      { product: 'TIGER 글로벌멀티에셋TDF2040', provider: '미래에셋자산운용', ret: 11.3, amt: '2.4억' },
+      { product: 'KODEX TRF3070', provider: '삼성자산운용', ret: 7.6, amt: '1.5억' },
+    ],
+  },
+  {
+    className: '국내주식ETF',
+    color: '#0ea5e9',
+    items: [
+      { product: 'KODEX 200', provider: '삼성자산운용', ret: 8.2, amt: '3.0억' },
+      { product: 'TIGER 코스피', provider: '미래에셋자산운용', ret: 6.9, amt: '1.6억' },
+    ],
+  },
+  {
+    className: '해외주식ETF',
+    color: '#6366f1',
+    items: [
+      { product: 'TIGER 미국나스닥100', provider: '미래에셋자산운용', ret: 21.5, amt: '3.6억' },
+      { product: 'TIGER 미국S&P500', provider: '미래에셋자산운용', ret: 15.4, amt: '2.2억' },
+    ],
+  },
+
 ]
 
 /* ---------- Simulation data ---------- */
@@ -188,6 +248,37 @@ const PRESETS: Record<string, { weights: Weights; selected: Selected }> = {
   },
 }
 
+type SavedPortfolio = {
+  id: string
+  name: string
+  weights: Weights
+  selected: Selected
+  savedAt: number
+}
+
+const STORAGE_KEY = 'cd_saved_portfolios'
+
+function loadPortfolios(): SavedPortfolio[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as SavedPortfolio[]) : []
+  } catch {
+    return []
+  }
+}
+
+function persistPortfolios(list: SavedPortfolio[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+  } catch {
+    /* ignore quota / serialization errors */
+  }
+}
+
+
+
 function shade(hex: string, amt: number) {
   const n = parseInt(hex.slice(1), 16)
   const r = Math.min(255, (n >> 16) + amt)
@@ -245,9 +336,20 @@ export function AssetManagement() {
 /* =========================================================
    현재 운용
    ========================================================= */
+function toEok(won: number): string {
+  return (won / 100_000_000).toFixed(1)
+}
+
 function CurrentPane() {
   const [period, setPeriod] = useState<PeriodKey>('3y')
+  const [dashboard, setDashboard] = useState<DbDashboard | null>(null)
   const p = periods[period]
+
+  useEffect(() => {
+    const controller = new AbortController()
+    getDbDashboard(controller.signal).then(setDashboard).catch(() => {})
+    return () => controller.abort()
+  }, [])
 
   const currentReturn = CURRENT_RETURN
   const [targetReturn, setTargetReturn] = useState(3.5)
@@ -277,17 +379,13 @@ function CurrentPane() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg">
                 <Wallet className="w-6 h-6 text-white" />
               </div>
-              <div className="flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium bg-emerald-100 text-emerald-600">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>+1.4억</span>
-              </div>
             </div>
             <div className="mt-4">
               <p className="text-sm text-muted-foreground">총 적립금</p>
               <p className="text-3xl font-bold text-foreground mt-1">
-                42.7<span className="text-lg font-normal text-muted-foreground ml-1">억</span>
+                {dashboard ? toEok(dashboard.funded_amount) : '-'}
+                <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">전월 대비 증가</p>
             </div>
           </CardContent>
         </Card>
@@ -450,7 +548,7 @@ function CurrentPane() {
                 </div>
                 자산 포트폴리오
               </CardTitle>
-              <span className="text-xs text-muted-foreground">총 42.7억</span>
+              <span className="text-xs text-muted-foreground">총 {dashboard ? toEok(dashboard.funded_amount) : '-'}억</span>
             </div>
           </CardHeader>
           <CardContent>
@@ -469,14 +567,16 @@ function CurrentPane() {
               </div>
               <div className="flex-1">
                 {portfolio.map((d) => (
-                  <div key={d.name} className="flex items-center justify-between py-2 border-b border-white/40 last:border-0 text-sm">
-                    <div className="flex items-center gap-2 text-foreground">
-                      <span className="w-2.5 h-2.5 rounded" style={{ background: d.color }} />
-                      {d.name}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-foreground w-9 text-right">{d.pct}%</span>
-                      <span className="text-xs text-muted-foreground w-12 text-right">{d.amt}</span>
+                  <div key={d.name} className="py-2 border-b border-white/40 last:border-0">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-foreground">
+                        <span className="w-2.5 h-2.5 rounded shrink-0" style={{ background: d.color }} />
+                        {d.name}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-foreground w-9 text-right">{d.pct}%</span>
+                        <span className="text-xs text-muted-foreground w-12 text-right">{d.amt}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -488,6 +588,52 @@ function CurrentPane() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 유형별 운용 상품 (full width) */}
+      <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '200ms' }}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            유형별 운용 상품
+            <span className="text-xs font-normal text-muted-foreground">현재 투자 중인 상품 내역</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {holdings.map((group) => (
+              <div
+                key={group.className}
+                className="rounded-2xl border-2 bg-white/40 overflow-hidden"
+                style={{ borderColor: group.color }}
+              >
+                <div
+                  className="flex items-center gap-2 px-3 py-2.5"
+                  style={{ background: `${group.color}1a` }}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: group.color }} />
+                  <span className="text-sm font-semibold text-foreground truncate">{group.className}</span>
+                  <span className="ml-auto text-xs text-muted-foreground shrink-0">{group.items.length}개</span>
+                </div>
+                <div className="p-2.5 space-y-2">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.product}
+                      className="px-3 py-2.5 rounded-xl border border-border bg-white/70"
+                    >
+                      <p className="text-sm text-foreground leading-snug">{item.product}</p>
+                      <p className="text-xs text-muted-foreground mb-1">{item.provider}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-emerald-600">+{item.ret}%</span>
+                        <span className="text-xs text-muted-foreground">{item.amt}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
     </div>
   )
 }
@@ -512,6 +658,72 @@ function SimPane() {
   const [weights, setWeights] = useState<Weights>({ deposit: 50, bond: 20, mixed: 10, domEq: 8, ovsEq: 12 })
   const [selected, setSelected] = useState<Selected>({ deposit: ['d1'], bond: ['b1'], mixed: ['m1'], domEq: ['k1'], ovsEq: ['o1', 'o2'] })
   const [open, setOpen] = useState<Record<string, boolean>>({})
+
+    /* 저장된 포트폴리오 */
+  const [saved, setSaved] = useState<SavedPortfolio[]>([])
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [loadOpen, setLoadOpen] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const loadRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setSaved(loadPortfolios())
+  }, [])
+
+  useEffect(() => {
+    if (!saveOpen && !loadOpen) return
+    const handler = (e: MouseEvent) => {
+      if (loadRef.current && !loadRef.current.contains(e.target as Node)) {
+        setSaveOpen(false)
+        setLoadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [saveOpen, loadOpen])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2200)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  const savePortfolio = () => {
+    const name = nameDraft.trim() || `포트폴리오 ${saved.length + 1}`
+    const entry: SavedPortfolio = {
+      id: `pf_${Date.now()}`,
+      name,
+      weights: { ...weights },
+      selected: JSON.parse(JSON.stringify(selected)),
+      savedAt: Date.now(),
+    }
+    const next = [entry, ...saved]
+    setSaved(next)
+    persistPortfolios(next)
+    setActiveId(entry.id)
+    setNameDraft('')
+    setSaveOpen(false)
+    setToast(`'${name}' 저장 완료`)
+  }
+
+  const loadPortfolio = (pf: SavedPortfolio) => {
+    setWeights({ ...pf.weights })
+    setSelected(JSON.parse(JSON.stringify(pf.selected)))
+    setActiveId(pf.id)
+    setLoadOpen(false)
+    setToast(`'${pf.name}' 불러옴`)
+  }
+
+  const deletePortfolio = (id: string) => {
+    const next = saved.filter((p) => p.id !== id)
+    setSaved(next)
+    persistPortfolios(next)
+    if (activeId === id) setActiveId(null)
+  }
+
+
 
   const classRet = (key: string) => {
     const sel = selected[key] || []
@@ -605,12 +817,111 @@ function SimPane() {
 
         <Card className="glass border-0 lg:col-span-2 animate-slide-up">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                <PieIcon className="w-4 h-4 text-white" />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+                  <PieIcon className="w-4 h-4 text-white" />
+                </div>
+                조정 포트폴리오
+              </CardTitle>
+              <div className="relative flex items-center gap-2">
+                <button
+                  onClick={() => { setSaveOpen((v) => !v); setLoadOpen(false) }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-primary to-accent text-white font-medium shadow-md hover:opacity-90 transition-all duration-300 hover:scale-105 active:scale-95"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  저장
+                </button>
+                <div className="relative" ref={loadRef}>
+                  <button
+                    onClick={() => { setLoadOpen((v) => !v); setSaveOpen(false) }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-white/50 bg-white/40 text-muted-foreground hover:bg-white/70 hover:text-foreground transition-all duration-300 hover:scale-105 active:scale-95"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    불러오기
+                    {saved.length > 0 && (
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold leading-none">
+                        {saved.length}
+                      </span>
+                    )}
+                  </button>
+                  {saveOpen && (
+                    <div className="absolute top-full right-0 mt-1 z-30 w-72 p-3 rounded-xl border border-white/60 bg-white/95 backdrop-blur shadow-lg animate-slide-up">
+                      <p className="text-xs font-medium text-foreground mb-2">현재 구성을 저장합니다</p>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={nameDraft}
+                        placeholder="포트폴리오 이름"
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') savePortfolio()
+                          if (e.key === 'Escape') setSaveOpen(false)
+                        }}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-white/60 bg-white/70 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/40 mb-2"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={savePortfolio}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          저장
+                        </button>
+                        <button
+                          onClick={() => setSaveOpen(false)}
+                          className="p-2 rounded-lg border border-white/60 bg-white/50 text-muted-foreground hover:text-foreground transition-all shrink-0"
+                          aria-label="저장 취소"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {loadOpen && (
+                    <div className="absolute top-full right-0 mt-1 z-30 w-72 p-3 rounded-xl border border-white/60 bg-white/95 backdrop-blur shadow-lg animate-slide-up">
+                      <p className="text-xs font-medium text-foreground mb-2">저장된 포트폴리오 ({saved.length})</p>
+                      {saved.length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-4 text-center">
+                          저장된 포트폴리오가 없습니다.
+                        </p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                          {saved.map((pf) => {
+                            const isActive = pf.id === activeId
+                            return (
+                              <div
+                                key={pf.id}
+                                className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                                  isActive ? 'border-primary/50 bg-primary/10' : 'border-white/50 bg-white/50'
+                                }`}
+                              >
+                                <button onClick={() => loadPortfolio(pf)} className="flex-1 min-w-0 text-left">
+                                  <p className="text-xs font-medium text-foreground truncate">
+                                    {pf.name}
+                                    {isActive && <span className="ml-1.5 text-[9px] text-primary font-semibold">적용됨</span>}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {new Date(pf.savedAt).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}
+                                  </p>
+                                </button>
+                                <button
+                                  onClick={() => deletePortfolio(pf.id)}
+                                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-white/70 transition-all shrink-0"
+                                  aria-label={`${pf.name} 삭제`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              조정 포트폴리오
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[170px]">
@@ -638,6 +949,7 @@ function SimPane() {
               </ResponsiveContainer>
             </div>
           </CardContent>
+
         </Card>
       </div>
 
@@ -816,6 +1128,15 @@ function SimPane() {
       <button className="w-full py-3 rounded-xl border border-primary text-primary text-sm font-medium hover:bg-primary/10 transition-all duration-300">
         이 구성으로 추천 의견 받기 ↗
       </button>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-foreground text-background text-sm font-medium shadow-lg animate-slide-up">
+          <Check className="w-4 h-4 text-emerald-400" />
+          {toast}
+        </div>
+      )}
+
     </div>
   )
 }

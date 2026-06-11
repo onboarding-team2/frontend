@@ -106,7 +106,7 @@ export function DBOverview() {
                 <Wallet className="w-6 h-6 text-white" />
               </div>
               <div className="mt-4">
-                <p className="text-sm text-muted-foreground">현재 적립금</p>
+                <p className="text-sm text-muted-foreground">총 적립금</p>
                 <p className="text-3xl font-bold text-foreground mt-1">
                   {data != null ? toEok(data.funded_amount) : '-'}
                   <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
