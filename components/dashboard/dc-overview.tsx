@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, Users, Wallet, AlertTriangle, CalendarClock, ShieldAlert, FileX, ChevronRight } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { getPensionDashboard, DcDashboard, getCompanyProfile, CompanyProfile } from '@/lib/api'
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { getPensionDashboard, DcDashboard, getCompanyProfile, CompanyProfile, getDcContributionChart, DcContributionChart } from '@/lib/api'
 import { WelcomeBanner } from './welcome-banner'
 
 function toEok(amount: number): string {
@@ -18,18 +18,80 @@ function calcDday(dueDateStr: string | null): string {
   return diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`
 }
 
-const contributionData = [
-  { month: '1월', planned: 120, actual: 115 },
-  { month: '2월', planned: 120, actual: 122 },
-  { month: '3월', planned: 120, actual: 118 },
-  { month: '4월', planned: 120, actual: 125 },
-  { month: '5월', planned: 120, actual: 0 },
-]
+
+function toCheonLabel(amount: number): string {
+  if (amount === 0) return '0'
+  const cheon = Math.round(amount / 1000)
+  return `${cheon.toLocaleString()}천원`
+}
+
+function ContributionBarChart({ chart }: { chart: DcContributionChart | null }) {
+  if (!chart) return null
+
+  const chartData = chart.items.map(item => ({ label: item.label, amount: item.amount, paid: item.paid }))
+  const maxAmount = Math.max(...chartData.map(d => d.amount), 1)
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={chartData} barCategoryGap="40%">
+          <defs>
+            <linearGradient id="barPaid" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2563eb" stopOpacity={1} />
+              <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.85} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 13, fill: 'var(--muted-foreground)' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis hide domain={[0, maxAmount * 1.2]} />
+          <Tooltip
+            cursor={false}
+            contentStyle={{
+              background: 'white',
+              border: 'none',
+              borderRadius: 12,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              fontSize: 13,
+            }}
+            formatter={(value, _name, props) => [
+              toCheonLabel(value as number),
+              (props.payload as { paid?: boolean })?.paid ? '납입완료' : '미납입',
+            ] as [string, string]}
+          />
+          <Bar dataKey="amount" name="amount" radius={[6, 6, 0, 0]} isAnimationActive>
+            {chartData.map((entry, i) => (
+              <Cell
+                key={i}
+                fill={entry.paid ? 'url(#barPaid)' : '#e2e8f0'}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-6 mt-2 pt-4 border-t border-white/50">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-gradient-to-b from-primary to-accent" />
+          <span className="text-sm text-muted-foreground">납입완료</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-slate-200" />
+          <span className="text-sm text-muted-foreground">미납입</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function DCOverview() {
   const router = useRouter()
   const [data, setData] = useState<DcDashboard | null>(null)
   const [company, setCompany] = useState<CompanyProfile | null>(null)
+  const [chart, setChart] = useState<DcContributionChart | null>(null)
 
   const totalMembers = data?.total_employee ?? 0
 
@@ -65,6 +127,11 @@ export function DCOverview() {
       })
     getCompanyProfile(ctrl.signal)
       .then(setCompany)
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      })
+    getDcContributionChart(ctrl.signal)
+      .then(setChart)
       .catch((e: unknown) => {
         if (e instanceof DOMException && e.name === 'AbortError') return
       })
@@ -279,57 +346,7 @@ export function DCOverview() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {contributionData.map((data, idx) => (
-              <div key={data.month} className="flex items-center gap-4 group">
-                <span className="w-12 text-sm text-muted-foreground font-medium">{data.month}</span>
-                <div className="flex-1 h-10 bg-white/50 rounded-xl overflow-hidden relative">
-                  {/* Planned line */}
-                  <div
-                    className="absolute h-full border-r-2 border-dashed border-muted-foreground/30"
-                    style={{ left: `${(data.planned / 150) * 100}%` }}
-                  />
-                  {/* Actual */}
-                  <div
-                    className={`absolute h-full rounded-xl transition-all duration-500 ${
-                      data.actual === 0 
-                        ? 'bg-slate-200' 
-                        : 'progress-fill'
-                    }`}
-                    style={{ 
-                      width: `${(data.actual / 150) * 100}%`,
-                      transitionDelay: `${idx * 100}ms`
-                    }}
-                  />
-                  {data.actual > 0 && (
-                    <div 
-                      className="absolute h-full flex items-center px-3"
-                      style={{ left: `${(data.actual / 150) * 100 - 12}%` }}
-                    >
-                      <span className="text-xs font-semibold text-white drop-shadow-lg">
-                        {data.actual}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <span className={`w-20 text-sm text-right font-medium transition-colors ${
-                  data.actual === 0 ? 'text-destructive' : 'text-foreground group-hover:text-primary'
-                }`}>
-                  {data.actual === 0 ? '미납입' : `${data.actual}백만`}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-6 mt-6 pt-4 border-t border-white/50">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-gradient-to-r from-primary to-accent" />
-              <span className="text-sm text-muted-foreground">실제 납입</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-0.5 border-t-2 border-dashed border-muted-foreground/50" />
-              <span className="text-sm text-muted-foreground">예정 금액</span>
-            </div>
-          </div>
+          <ContributionBarChart chart={chart} />
         </CardContent>
       </Card>
     </div>
