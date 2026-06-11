@@ -143,10 +143,10 @@ export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {
               <li key={item.id}>
                 <button
                   onClick={() => setActiveTab(item.id)}
-                  className={`menu-item w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all text-left group ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 text-left group ${
                     isActive
-                      ? 'active bg-gradient-to-r from-primary/15 to-accent/10 text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-white/50 hover:text-foreground'
+                      ? 'bg-gradient-to-r from-primary/15 to-accent/10 text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-primary/10 hover:text-primary active:scale-[0.99]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
