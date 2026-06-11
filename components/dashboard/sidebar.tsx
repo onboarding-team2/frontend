@@ -67,6 +67,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     localStorage.removeItem('planType')
     
     deleteCookie('token')
+    deleteCookie('planType')
 
     router.push('/')
   }
