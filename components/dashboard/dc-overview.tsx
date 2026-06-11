@@ -9,7 +9,7 @@ import { getPensionDashboard, DcDashboard, getCompanyProfile, CompanyProfile, ge
 import { WelcomeBanner } from './welcome-banner'
 
 function toEok(amount: number): string {
-  return (amount / 100000000).toFixed(2)
+  return (amount / 1000000).toFixed(0)
 }
 
 function calcDday(dueDateStr: string | null): string {
@@ -165,7 +165,7 @@ export function DCOverview() {
               <p className="text-sm text-muted-foreground">DC형 총 적립금</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.total_balance) : '-'}
-                <span className="text-lg font-normal text-muted-foreground ml-1">억원</span>
+                <span className="text-lg font-normal text-muted-foreground ml-1">백만원</span>
               </p>
             </div>
           </CardContent>
@@ -221,7 +221,7 @@ export function DCOverview() {
               <p className="text-sm text-muted-foreground">{contributionTitle}</p>
               <p className="text-3xl font-bold text-foreground mt-1">
                 {data ? toEok(data.this_month_contribution) : '-'}
-                <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
+                <span className="text-lg font-normal text-muted-foreground ml-1">백만원</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 납입기한 <span className="font-semibold text-foreground">{dueLabel}</span>
@@ -248,7 +248,7 @@ export function DCOverview() {
               const Icon = item.icon
               const incomplete = item.count
               const complete = Math.max(totalMembers - incomplete, 0)
-              const percent = totalMembers > 0 ? ((incomplete / totalMembers) * 100).toFixed(1) : '0.0'
+              const percent = totalMembers > 0 ? ((incomplete / totalMembers) * 100).toFixed(0) : '0.0'
               const chartData = [
                 { name: item.incompleteLabel, value: incomplete, color: item.chartColor },
                 { name: item.completeLabel, value: complete, color: '#e2e8f0' },
