@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, FileText, Download, ExternalLink, Folder, ChevronRight, Sparkles } from 'lucide-react'
+import { useChat } from '@/lib/chat-context'
 
 interface Document {
   id: string
@@ -53,6 +54,7 @@ const getFileTypeStyle = (type: Document['fileType']) => {
 export function DocumentForms() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const openChat = useChat()
 
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch = doc.name.includes(searchTerm) || doc.description.includes(searchTerm)
@@ -82,7 +84,7 @@ export function DocumentForms() {
 
       {/* Search */}
       <Card className="glass border-0 animate-slide-up">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <Input
@@ -93,6 +95,15 @@ export function DocumentForms() {
               className="pl-11 h-12 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
             />
           </div>
+          <button
+            onClick={openChat}
+            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-all group self-start"
+          >
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-muted-foreground">필요한 서류를 못 찾으셨다면</span>
+            <span className="text-primary font-semibold">AI 챗봇에게 물어보기</span>
+            <ChevronRight className="w-4 h-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </CardContent>
       </Card>
 
@@ -176,28 +187,6 @@ export function DocumentForms() {
         </div>
       </div>
 
-      {/* Chatbot CTA */}
-      <Card className="glass border-0 bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 border border-primary/20 hover-lift animate-slide-up">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-float glow-blue">
-                <Sparkles className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground text-lg">필요한 서류를 찾기 어려우신가요?</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  AI 챗봇에게 상황을 설명하시면 필요한 양식을 안내해드립니다
-                </p>
-              </div>
-            </div>
-            <Button className="btn-hover bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white gap-2 shrink-0 px-6 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
-              챗봇 상담하기
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
