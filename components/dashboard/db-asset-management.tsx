@@ -14,6 +14,7 @@ import {
   Pie,
   Cell,
   Legend,
+  ReferenceLine,
 } from 'recharts'
 import {
   PieChart as PieIcon,
@@ -25,6 +26,8 @@ import {
   TrendingUp,
   Wallet,
   ArrowUpRight,
+  Target,
+  Pencil,
 } from 'lucide-react'
 
 type SubTab = 'current' | 'sim'
@@ -80,6 +83,8 @@ const periods = {
 } as const
 
 type PeriodKey = keyof typeof periods
+
+const CURRENT_RETURN = 4.2
 
 const portfolio = [
   { name: '원리금보장형', pct: 72, amt: '30.7억', color: '#2563eb' },
@@ -242,10 +247,28 @@ function CurrentPane() {
   const [period, setPeriod] = useState<PeriodKey>('3y')
   const p = periods[period]
 
+  const currentReturn = CURRENT_RETURN
+  const [targetReturn, setTargetReturn] = useState(3.5)
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetDraft, setTargetDraft] = useState('3.5')
+
+  const diff = +(currentReturn - targetReturn).toFixed(1)
+  const overAchieved = diff >= 0
+
+  const commitTarget = () => {
+    const v = parseFloat(targetDraft)
+    if (!isNaN(v) && v >= 0 && v <= 100) {
+      setTargetReturn(+v.toFixed(1))
+    } else {
+      setTargetDraft(targetReturn.toString())
+    }
+    setEditingTarget(false)
+  }
+
   return (
     <div className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="glass border-0 card-interactive bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
@@ -273,15 +296,63 @@ function CurrentPane() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-              <div className="flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium bg-emerald-100 text-emerald-600">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>+0.7%p</span>
+              <div className={`flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium ${overAchieved ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}`}>
+                <ArrowUpRight className={`w-3 h-3 ${overAchieved ? '' : 'rotate-90'}`} />
+                <span>{overAchieved ? '+' : ''}{diff}%p</span>
               </div>
             </div>
             <div className="mt-4">
               <p className="text-sm text-muted-foreground">당기 수익률</p>
-              <p className="text-3xl font-bold text-foreground mt-1">4.2%</p>
-              <p className="text-xs text-muted-foreground mt-1">목표 대비 초과 달성</p>
+              <p className="text-3xl font-bold text-foreground mt-1">{currentReturn}%</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                목표 대비 {Math.abs(diff)}%p {overAchieved ? '초과 달성' : '미달'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass border-0 card-interactive bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-400 flex items-center justify-center shadow-lg">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+              {!editingTarget && (
+                <button
+                  onClick={() => { setTargetDraft(targetReturn.toString()); setEditingTarget(true) }}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80 transition-all"
+                >
+                  <Pencil className="w-3 h-3" />
+                  수정
+                </button>
+              )}
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">목표 수익률</p>
+              {editingTarget ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    max={100}
+                    autoFocus
+                    value={targetDraft}
+                    onChange={(e) => setTargetDraft(e.target.value)}
+                    onBlur={commitTarget}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitTarget()
+                      if (e.key === 'Escape') { setTargetDraft(targetReturn.toString()); setEditingTarget(false) }
+                    }}
+                    className="w-20 text-2xl font-bold text-foreground bg-white/70 border border-primary/40 rounded-lg px-2 py-0.5 outline-none focus:border-primary"
+                    aria-label="목표 수익률 입력"
+                  />
+                  <span className="text-lg font-bold text-foreground">%</span>
+                </div>
+              ) : (
+                <p className="text-3xl font-bold text-foreground mt-1">{targetReturn}%</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">연간 운용 목표</p>
             </div>
           </CardContent>
         </Card>
@@ -316,8 +387,7 @@ function CurrentPane() {
           <CardContent>
             <div className="flex flex-wrap items-center gap-4 mb-3">
               <Legendish color="#2563eb" label="우리 회사" />
-              <Legendish dashed label="목표 3.5%" />
-              <Legendish color="#94a3b8" label="동업종 평균" />
+              <Legendish dashed label={`목표 ${targetReturn}%`} />
             </div>
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -330,8 +400,7 @@ function CurrentPane() {
                     formatter={(v: number) => `${v}%`}
                   />
                   <Line type="monotone" dataKey="ours" name="우리 회사" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: '#2563eb' }} />
-                  <Line type="monotone" dataKey="target" name="목표" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
-                  <Line type="monotone" dataKey="ind" name="동업종" stroke="#cbd5e1" strokeWidth={1.5} dot={false} />
+                  <ReferenceLine y={targetReturn} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 4" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -494,8 +563,13 @@ function SimPane() {
         <Card className="glass border-0 bg-gradient-to-br from-primary/15 to-accent/5 animate-slide-up">
           <CardContent className="p-6 h-full flex flex-col justify-center">
             <p className="text-xs text-muted-foreground mb-2">예상 연 수익률</p>
-            <p className="text-5xl font-bold gradient-text leading-none">{expReturn}</p>
-            <p className="text-xs text-muted-foreground mt-3">선택 상품 3년 평균 가중 기준</p>
+            <div className="flex items-end gap-3 flex-wrap">
+              <p className="text-5xl font-bold gradient-text leading-none">{expReturn}</p>
+              <p className="text-sm text-muted-foreground leading-none pb-1">
+                현재 <span className="font-semibold text-foreground">{CURRENT_RETURN}%</span>
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">선택 상품 3년 평균 가중 기준 · 현재 운용 수익률과 비교</p>
           </CardContent>
         </Card>
 
@@ -566,6 +640,23 @@ function SimPane() {
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground mb-4">자산군 비중을 조절하고 편입 상품을 선택하세요 · 고위험 자산군은 복수 상품 분산이 가능합니다</p>
+
+          {(riskSum > 70 || concMsgs.length > 0) && (
+            <div className="space-y-2 mb-4">
+              {riskSum > 70 && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-100 text-red-500 text-xs font-medium">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  위험자산 비중이 법정 한도 70%를 초과했습니다 (현재 {riskSum}%)
+                </div>
+              )}
+              {concMsgs.length > 0 && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-100 text-amber-700 text-xs font-medium">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  분산투자 권장: {concMsgs.join(' · ')} → 2개 이상 상품 선택을 권장합니다
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3">
             {Object.entries(CLASSES).map(([key, cls]) => {
@@ -675,18 +766,6 @@ function SimPane() {
             </button>
           </div>
 
-          {riskSum > 70 && (
-            <div className="flex items-center gap-2 mt-2 p-2.5 rounded-xl bg-red-100 text-red-500 text-xs font-medium">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              위험자산 비중이 법정 한도 70%를 초과했습니다
-            </div>
-          )}
-          {concMsgs.length > 0 && (
-            <div className="flex items-center gap-2 mt-2 p-2.5 rounded-xl bg-amber-100 text-amber-700 text-xs font-medium">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              분산투자 권장: {concMsgs.join(' · ')} → 2개 이상 상품 선택을 권장합니다
-            </div>
-          )}
         </CardContent>
       </Card>
 
