@@ -59,6 +59,27 @@ export type CompanyProfile = {
   planType: string
 }
 
+export type ContributionChartItem = {
+  label: string
+  amount: number
+  paid: boolean
+}
+
+export type DcContributionChart = {
+  cycle: 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+  items: ContributionChartItem[]
+}
+
+export async function getDcContributionChart(signal?: AbortSignal): Promise<DcContributionChart> {
+  const res = await fetch(`${API_BASE}/company/dc-contributions`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '부담금 납입 현황 조회 실패'))
+  return res.json()
+}
+
 export async function getCompanyProfile(signal?: AbortSignal): Promise<CompanyProfile> {
   const res = await fetch(`${API_BASE}/company/profile`, {
     headers: authHeaders(),
