@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Calendar, List, Plus, Search, CheckCircle2,
   XCircle, Clock, Building2, Users, Trash2, X,
@@ -12,6 +12,7 @@ import {
   TargetType,
 } from '@/lib/schedule-data'
 import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
+import { getChoseong } from 'es-hangul'
 import {
   Employee,
   ScheduleDcDetail,
@@ -21,7 +22,7 @@ import {
   createScheduleDc,
   deleteScheduleDc,
   completeScheduleDc,
-  getDcMemberDetail,
+  getPensionMemberDetail,
   getCompanyProfile,
 } from '@/lib/api'
 
@@ -31,10 +32,6 @@ type FilterCategory = 'all' | 'imminent' | 'overdue'
 // ─── API 응답 → Schedule 변환 ─────────────────────────────────────
 
 function convertDetailToSchedule(detail: ScheduleDcDetail): Schedule {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const dueDate = new Date(detail.due_date)
-  const isOverdue = dueDate < today && detail.status !== '완료'
   const hasEmployees = detail.target_employees && detail.target_employees.length > 0
 
   return {
@@ -45,7 +42,7 @@ function convertDetailToSchedule(detail: ScheduleDcDetail): Schedule {
     type: 'DC',
     targetType: hasEmployees ? '가입자' : ('기업' as TargetType),
     priority: 'medium',
-    status: detail.status === '완료' ? '완료' : isOverdue ? '지연' : '예정',
+    status: detail.status === 'DONE' ? '완료' : detail.status === 'OVERDUE' ? '지연' : '예정',
     createdAt: detail.created_date || '',
     relatedSubscribers: hasEmployees
       ? detail.target_employees.map(e => ({
@@ -162,7 +159,7 @@ function DetailModalContent({
 
   const handleSubscriberClick = async (sub: { id: string; name: string; employeeId: string; company: string; joinDate: string; balance: number }) => {
     try {
-      const fetched = await getDcMemberDetail(Number(sub.id))
+      const fetched = await getPensionMemberDetail(Number(sub.id))
       const detail: SubscriberDetail = {
         id: String(fetched.id),
         employeeId: String(fetched.id),
@@ -179,7 +176,6 @@ function DetailModalContent({
       }
       onSubscriberClick(detail)
     } catch {
-      // 조회 실패 시 기본 정보로 표시
       onSubscriberClick({
         id: sub.id,
         employeeId: sub.employeeId,
@@ -323,17 +319,28 @@ function AddModalContent({
   const [selectedSubscribers, setSelectedSubscribers] = useState<Employee[]>([])
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false)
 
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) { 
+        setShowSubscriberDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => { document.removeEventListener('mousedown', handleClickOutside); };
+  }, []);
+
   useEffect(() => {
     getDcMembers().then(setAllMembers).catch(() => {})
   }, [])
 
-  const filteredMembers = useMemo(() => {
-    if (!subscriberSearch.trim()) return []
-    const query = subscriberSearch.toLowerCase()
-    return allMembers
-      .filter(m => m.name.toLowerCase().includes(query))
-      .slice(0, 5)
-  }, [subscriberSearch, allMembers])
+  const filteredMembers = allMembers
+  .filter(member => !selectedSubscribers.some(selected => selected.id === member.id))
+  .filter(member =>
+    member.name.includes(subscriberSearch) ||
+    getChoseong(member.name).includes(subscriberSearch)
+  )
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -449,7 +456,7 @@ function AddModalContent({
         </div>
 
         {/* 연관 가입자 검색/선택 */}
-        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5 space-y-4">
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5 space-y-4" ref={dropdownRef}>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-cyan-600" />
@@ -464,7 +471,7 @@ function AddModalContent({
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white/80"
-                placeholder="이름, 사번, 소속기업으로 검색..."
+                placeholder="이름으로 검색..."
                 value={subscriberSearch}
                 onChange={e => {
                   setSubscriberSearch(e.target.value)
@@ -797,27 +804,21 @@ export function ScheduleManagement() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [subscriberDetail, setSubscriberDetail] = useState<SubscriberDetail | null>(null)
 
-  // 마운트 시 API에서 일정 로드
   useEffect(() => {
     const controller = new AbortController()
     getSchedulesDc({}, controller.signal)
       .then(res => {
-        const items = res.schedules.map(item => {
-          const today = new Date(); today.setHours(0, 0, 0, 0)
-          const dueDate = new Date(item.due_date)
-          const isOverdue = dueDate < today && item.status !== '완료'
-          return {
-            id: String(item.id),
-            title: item.title,
-            dueDate: item.due_date,
-            content: '',
-            type: 'DC' as const,
-            targetType: '기업' as TargetType,
-            priority: 'medium' as const,
-            status: item.status === '완료' ? ('완료' as const) : isOverdue ? ('지연' as const) : ('예정' as const),
-            createdAt: '',
-          }
-        })
+        const items = res.schedules.map(item => ({
+          id: String(item.id),
+          title: item.title,
+          dueDate: item.due_date,
+          content: '',
+          type: 'DC' as const,
+          targetType: '기업' as TargetType,
+          priority: 'medium' as const,
+          status: item.status === 'DONE' ? ('완료' as const) : item.status === 'OVERDUE' ? ('지연' as const) : ('예정' as const),
+          createdAt: '',
+        }))
         setSchedules(items)
       })
       .catch(() => {})
@@ -825,36 +826,33 @@ export function ScheduleManagement() {
     return () => controller.abort()
   }, [])
 
-  // 일정 클릭 시 상세 정보 fetch
   const handleViewDetail = async (schedule: Schedule) => {
     setSelectedSchedule(schedule)
     const id = Number(schedule.id)
     if (isNaN(id)) return
     try {
-      console.log('[DC schedule] fetching detail', id)
-      const detail = await getScheduleDcDetail(id)
-      console.log('[DC schedule] detail response', detail)
-      const converted = convertDetailToSchedule(detail)
-      if ((!converted.relatedSubscribers || converted.relatedSubscribers.length === 0) && (!converted.relatedCompanies || converted.relatedCompanies.length === 0)) {
-        try {
-          const cp = await getCompanyProfile()
-          converted.relatedCompanies = [
-            {
-              id: String(cp.companyName),
-              name: cp.companyName,
-              businessNumber: cp.businessNumber,
-              employeeCount: 0,
-              planType: (cp.planType as 'DC' | 'DB') ?? 'DC',
-              contractDate: '',
-            },
-          ]
-        } catch (error) {
-          console.warn('[DC schedule] company profile fallback failed', error)
+        const detail = await getScheduleDcDetail(id)
+        const s = convertDetailToSchedule(detail)
+        // If no target subscribers and no company info returned, use current logged-in company
+        if ((!s.relatedSubscribers || s.relatedSubscribers.length === 0) && (!s.relatedCompanies || s.relatedCompanies.length === 0)) {
+          try {
+            const cp = await getCompanyProfile()
+            s.relatedCompanies = [
+              {
+                id: String(cp.companyName),
+                name: cp.companyName,
+                businessNumber: cp.businessNumber,
+                employeeCount: 0,
+                planType: (cp.planType as 'DC' | 'DB') ?? 'DC',
+                contractDate: '',
+              }
+            ]
+          } catch {
+            // ignore
+          }
         }
-      }
-      setSelectedSchedule(converted)
-    } catch (error) {
-      console.warn('[DC schedule] detail fetch failed', error)
+        setSelectedSchedule(s)
+    } catch {
       // 기본 데이터로 유지
     }
   }

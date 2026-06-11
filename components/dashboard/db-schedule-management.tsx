@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Calendar, List, Plus, Search, CheckCircle2,
   XCircle, Clock, Building2, Users, Trash2, X,
@@ -12,6 +12,7 @@ import {
   TargetType,
 } from '@/lib/schedule-data'
 import { SubscriberDetailModal, SubscriberDetail } from './subscriber-detail-modal'
+import { getChoseong } from 'es-hangul'
 import {
   Employee,
   ScheduleDbDetail,
@@ -317,18 +318,29 @@ function AddModalContent({
   const [subscriberSearch, setSubscriberSearch] = useState('')
   const [selectedSubscribers, setSelectedSubscribers] = useState<Employee[]>([])
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false)
+  
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) { 
+        setShowSubscriberDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => { document.removeEventListener('mousedown', handleClickOutside); };
+  }, []);
 
   useEffect(() => {
     getDbMembers().then(setAllMembers).catch(() => {})
   }, [])
 
-  const filteredMembers = useMemo(() => {
-    if (!subscriberSearch.trim()) return []
-    const query = subscriberSearch.toLowerCase()
-    return allMembers
-      .filter(m => m.name.toLowerCase().includes(query))
-      .slice(0, 5)
-  }, [subscriberSearch, allMembers])
+  const filteredMembers = allMembers
+  .filter(member => !selectedSubscribers.some(selected => selected.id === member.id))
+  .filter(member =>
+    member.name.includes(subscriberSearch) ||
+    getChoseong(member.name).includes(subscriberSearch)
+  )
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -444,7 +456,7 @@ function AddModalContent({
         </div>
 
         {/* 연관 가입자 검색/선택 */}
-        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5 space-y-4">
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5 space-y-4" ref={dropdownRef}>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-cyan-600" />
