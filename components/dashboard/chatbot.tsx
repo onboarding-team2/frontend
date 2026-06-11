@@ -156,23 +156,38 @@ function parseMessageSegments(content: string): MessageSegment[] {
   return segments
 }
 
-/** 텍스트 안의 인라인 URL을 클릭 가능한 링크로 변환한다. */
+/** **bold** 마크다운과 URL을 동시에 처리한다. */
+const INLINE_SEGMENT_RE = /(\*\*[^*\n]+\*\*)|(https?:\/\/[^\s)]+)/g
+
 function renderTextWithLinks(text: string) {
-  return text.split(INLINE_URL_RE).map((part, index) =>
-    part.startsWith('http') ? (
-      <a
-        key={index}
-        href={part}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary font-medium underline underline-offset-2 hover:text-accent break-all"
-      >
-        {part}
-      </a>
-    ) : (
-      part
-    ),
-  )
+  const result: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  INLINE_SEGMENT_RE.lastIndex = 0
+  while ((match = INLINE_SEGMENT_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      result.push(text.slice(lastIndex, match.index))
+    }
+    if (match[1]) {
+      result.push(<strong key={match.index}>{match[1].slice(2, -2)}</strong>)
+    } else if (match[2]) {
+      result.push(
+        <a
+          key={match.index}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary font-medium underline underline-offset-2 hover:text-accent break-all"
+        >
+          {match[2]}
+        </a>
+      )
+    }
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) result.push(text.slice(lastIndex))
+  return result
 }
 
 function MessageContent({ content }: { content: string }) {
@@ -453,7 +468,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                     <div className={`p-4 rounded-2xl transition-all duration-300 hover:shadow-md ${
                       message.role === 'user'
                         ? 'bg-gradient-to-r from-primary to-accent text-white rounded-tr-sm shadow-md'
-                        : 'bg-white/70 text-foreground rounded-tl-sm border border-white/50'
+                        : 'bg-slate-50 text-foreground rounded-tl-sm border border-slate-200'
                     }`}>
                       {message.role === 'bot' ? (
                         <>
@@ -518,7 +533,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
-                  <div className="p-4 bg-white/70 rounded-2xl rounded-tl-sm border border-white/50">
+                  <div className="p-4 bg-slate-50 rounded-2xl rounded-tl-sm border border-slate-200">
                     <div className="flex gap-1.5">
                       <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                       <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
