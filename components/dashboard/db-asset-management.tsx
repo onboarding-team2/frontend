@@ -1,7 +1,17 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, type CSSProperties } from 'react'
-import { getDbDashboard, type DbDashboard } from '@/lib/api'
+import {
+  getAssetsCurrent,
+  updateTargetReturnRate,
+  getSimulationOptions,
+  saveSimulation,
+  listSimulations,
+  deleteSimulation,
+  type AssetsCurrent,
+  type AssetClassOption,
+  type Simulation,
+} from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   LineChart,
@@ -36,248 +46,16 @@ import {
   Trash2,
   Check,
   X,
-
 } from 'lucide-react'
 
 type SubTab = 'current' | 'sim'
+type PeriodKey = '6m' | '1y' | '3y'
 
-/* ---------- Current operation data ---------- */
-const periods = {
-  '6m': {
-    label: '6개월',
-    data: [
-      { name: '12월', ours: 3.1, target: 3.5, ind: 2.9 },
-      { name: '1월', ours: 3.4, target: 3.5, ind: 3.1 },
-      { name: '2월', ours: 3.8, target: 3.5, ind: 3.3 },
-      { name: '3월', ours: 4.0, target: 3.5, ind: 3.5 },
-      { name: '4월', ours: 3.9, target: 3.5, ind: 3.4 },
-      { name: '5월', ours: 4.2, target: 3.5, ind: 3.5 },
-    ],
-    summary: '최근 6개월 평균 3.9% · 최고 4.2%(5월) · 목표 초과 4개월',
-  },
-  '1y': {
-    label: '1년',
-    data: [
-      { name: '6월', ours: 2.8, target: 3.5, ind: 2.7 },
-      { name: '7월', ours: 2.9, target: 3.5, ind: 2.8 },
-      { name: '8월', ours: 3.2, target: 3.5, ind: 3.0 },
-      { name: '9월', ours: 3.0, target: 3.5, ind: 2.9 },
-      { name: '10월', ours: 3.3, target: 3.5, ind: 3.1 },
-      { name: '11월', ours: 3.2, target: 3.5, ind: 3.1 },
-      { name: '12월', ours: 3.1, target: 3.5, ind: 2.9 },
-      { name: '1월', ours: 3.4, target: 3.5, ind: 3.1 },
-      { name: '2월', ours: 3.8, target: 3.5, ind: 3.3 },
-      { name: '3월', ours: 4.0, target: 3.5, ind: 3.5 },
-      { name: '4월', ours: 3.9, target: 3.5, ind: 3.4 },
-      { name: '5월', ours: 4.2, target: 3.5, ind: 3.5 },
-    ],
-    summary: '최근 1년 평균 3.4% · 동업종 대비 +0.5%p 우위',
-  },
-  '3y': {
-    label: '3년',
-    data: [
-      { name: '23 1Q', ours: 2.1, target: 3.5, ind: 2.0 },
-      { name: '2Q', ours: 2.4, target: 3.5, ind: 2.2 },
-      { name: '3Q', ours: 2.6, target: 3.5, ind: 2.3 },
-      { name: '4Q', ours: 2.8, target: 3.5, ind: 2.5 },
-      { name: '24 1Q', ours: 3.0, target: 3.5, ind: 2.7 },
-      { name: '2Q', ours: 3.1, target: 3.5, ind: 2.8 },
-      { name: '3Q', ours: 3.2, target: 3.5, ind: 2.9 },
-      { name: '4Q', ours: 3.3, target: 3.5, ind: 3.0 },
-      { name: '25 1Q', ours: 3.7, target: 3.5, ind: 3.2 },
-      { name: '2Q', ours: 4.1, target: 3.5, ind: 3.4 },
-    ],
-    summary: '3년 누적 수익률 11.2% · 동업종 누적 대비 +1.8%p · 매년 목표 초과 달성',
-  },
-} as const
+// ── helpers ─────────────────────────────────────────────────────────────────
 
-type PeriodKey = keyof typeof periods
-
-const CURRENT_RETURN = 4.2
-
-const portfolio = [
-  // { name: '원리금보장형', pct: 72, amt: '30.7억', color: '#2563eb', products: ['IBK 정기예금 1년', 'ELB 지수연계형'] },
-  // { name: '실적배당형', pct: 21, amt: '9.0억', color: '#0ea5e9', products: ['TIGER 미국나스닥100', 'KODEX 미국S&P500TR'] },
-  // { name: '채권형', pct: 7, amt: '3.0억', color: '#94a3b8', products: ['KODEX 28-12 회사채(AA-)'] },
-    { name: '원리금보장형', pct: 72, amt: '30.7억', color: '#2563eb' },
-  { name: '실적배당형', pct: 21, amt: '9.0억', color: '#0ea5e9' },
-  { name: '채권형', pct: 7, amt: '3.0억', color: '#94a3b8' },
-]
-
-/* 자산 유형별 실제 운용 상품 (investment_product_master · asset_class_master 기준) */
-const holdings: {
-  className: string
-  color: string
-  items: { product: string; provider: string; ret: number; amt: string }[]
-}[] = [
-  {
-    className: '원리금보장형',
-    color: '#2563eb',
-    items: [
-      { product: 'IBK 정기예금 1년', provider: 'IBK기업은행', ret: 3.6, amt: '18.0억' },
-      { product: 'IBK GIC 2년', provider: 'IBK기업은행', ret: 3.4, amt: '8.7억' },
-      { product: 'ELB 지수연계형', provider: '미래에셋증권', ret: 4.1, amt: '4.0억' },
-    ],
-  },
-  {
-    className: '채권형',
-    color: '#94a3b8',
-    items: [
-      { product: 'KODEX 28-12 회사채(AA-)', provider: '삼성자산운용', ret: 5.8, amt: '1.8억' },
-      { product: 'ACE 국고채10년', provider: '한국투자신탁운용', ret: 4.9, amt: '1.2억' },
-    ],
-  },
-  {
-    className: '혼합형·TDF',
-    color: '#14b8a6',
-    items: [
-      { product: 'TIGER 글로벌멀티에셋TDF2040', provider: '미래에셋자산운용', ret: 11.3, amt: '2.4억' },
-      { product: 'KODEX TRF3070', provider: '삼성자산운용', ret: 7.6, amt: '1.5억' },
-    ],
-  },
-  {
-    className: '국내주식ETF',
-    color: '#0ea5e9',
-    items: [
-      { product: 'KODEX 200', provider: '삼성자산운용', ret: 8.2, amt: '3.0억' },
-      { product: 'TIGER 코스피', provider: '미래에셋자산운용', ret: 6.9, amt: '1.6억' },
-    ],
-  },
-  {
-    className: '해외주식ETF',
-    color: '#6366f1',
-    items: [
-      { product: 'TIGER 미국나스닥100', provider: '미래에셋자산운용', ret: 21.5, amt: '3.6억' },
-      { product: 'TIGER 미국S&P500', provider: '미래에셋자산운용', ret: 15.4, amt: '2.2억' },
-    ],
-  },
-
-]
-
-/* ---------- Simulation data ---------- */
-interface Product {
-  id: string
-  name: string
-  ret: number
-  tag: string
+function toEok(won: number): string {
+  return (won / 100_000_000).toFixed(1)
 }
-interface AssetClass {
-  name: string
-  risk: boolean
-  multi: boolean
-  color: string
-  products: Product[]
-}
-
-const CLASSES: Record<string, AssetClass> = {
-  deposit: {
-    name: '원리금보장형',
-    risk: false,
-    multi: false,
-    color: '#2563eb',
-    products: [
-      { id: 'd1', name: 'IBK 정기예금 1년', ret: 3.6, tag: '기본' },
-      { id: 'd2', name: 'IBK GIC 2년', ret: 3.4, tag: '' },
-      { id: 'd3', name: 'ELB 지수연계형', ret: 4.1, tag: '수익률 1위' },
-    ],
-  },
-  bond: {
-    name: '채권형',
-    risk: false,
-    multi: false,
-    color: '#64748b',
-    products: [
-      { id: 'b1', name: 'KODEX 28-12 회사채(AA-)', ret: 5.8, tag: '수익률 1위' },
-      { id: 'b2', name: 'ACE 국고채10년', ret: 4.9, tag: '안정' },
-      { id: 'b3', name: '국공채 펀드', ret: 4.0, tag: '' },
-    ],
-  },
-  mixed: {
-    name: '혼합형/TDF',
-    risk: true,
-    multi: true,
-    color: '#6366f1',
-    products: [
-      { id: 'm1', name: 'TIGER 글로벌멀티에셋TDF2040', ret: 11.3, tag: 'TDF' },
-      { id: 'm2', name: 'KODEX TRF3070', ret: 8.4, tag: '안정혼합' },
-      { id: 'm3', name: '한국밸런스 혼합펀드', ret: 6.8, tag: '' },
-    ],
-  },
-  domEq: {
-    name: '국내주식형',
-    risk: true,
-    multi: true,
-    color: '#0ea5e9',
-    products: [
-      { id: 'k1', name: 'KODEX 200', ret: 8.2, tag: '대표지수' },
-      { id: 'k2', name: 'TIGER 코스피', ret: 7.9, tag: '' },
-      { id: 'k3', name: 'KODEX 코스닥150', ret: 11.4, tag: '수익률 1위' },
-      { id: 'k4', name: 'ACE 배당성장', ret: 9.1, tag: '배당' },
-    ],
-  },
-  ovsEq: {
-    name: '해외주식형',
-    risk: true,
-    multi: true,
-    color: '#06b6d4',
-    products: [
-      { id: 'o1', name: 'TIGER 미국나스닥100', ret: 21.5, tag: '수익률 1위' },
-      { id: 'o2', name: 'KODEX 미국S&P500TR', ret: 17.2, tag: '보수 최저' },
-      { id: 'o3', name: 'SOL 미국배당다우존스', ret: 11.9, tag: '월배당' },
-      { id: 'o4', name: 'ACE 미국테크TOP10', ret: 24.1, tag: '고변동' },
-      { id: 'o5', name: 'TIGER 차이나전기차', ret: 6.2, tag: '' },
-    ],
-  },
-}
-
-type Weights = Record<string, number>
-type Selected = Record<string, string[]>
-
-const PRESETS: Record<string, { weights: Weights; selected: Selected }> = {
-  safe: {
-    weights: { deposit: 65, bond: 25, mixed: 10, domEq: 0, ovsEq: 0 },
-    selected: { deposit: ['d1'], bond: ['b2'], mixed: ['m2'], domEq: ['k1'], ovsEq: ['o2'] },
-  },
-  balanced: {
-    weights: { deposit: 40, bond: 20, mixed: 15, domEq: 10, ovsEq: 15 },
-    selected: { deposit: ['d1'], bond: ['b1'], mixed: ['m1'], domEq: ['k1', 'k4'], ovsEq: ['o1', 'o2'] },
-  },
-  growth: {
-    weights: { deposit: 20, bond: 10, mixed: 10, domEq: 20, ovsEq: 40 },
-    selected: { deposit: ['d1'], bond: ['b1'], mixed: ['m1'], domEq: ['k1', 'k3'], ovsEq: ['o1', 'o2', 'o3'] },
-  },
-}
-
-type SavedPortfolio = {
-  id: string
-  name: string
-  weights: Weights
-  selected: Selected
-  savedAt: number
-}
-
-const STORAGE_KEY = 'cd_saved_portfolios'
-
-function loadPortfolios(): SavedPortfolio[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as SavedPortfolio[]) : []
-  } catch {
-    return []
-  }
-}
-
-function persistPortfolios(list: SavedPortfolio[]) {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
-  } catch {
-    /* ignore quota / serialization errors */
-  }
-}
-
-
 
 function shade(hex: string, amt: number) {
   const n = parseInt(hex.slice(1), 16)
@@ -287,12 +65,34 @@ function shade(hex: string, amt: number) {
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
 }
 
+function formatMonthLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}월`
+}
+
+function formatQuarterLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  const q = Math.ceil((d.getMonth() + 1) / 3)
+  return `${String(d.getFullYear()).slice(2)} ${q}Q`
+}
+
+// ── types for simulation state ───────────────────────────────────────────────
+type Weights = Record<string, number>
+type Selected = Record<string, number[]>  // product IDs (DB IDs)
+
+const PRESETS_BY_CODE: Record<string, Record<string, number>> = {
+  safe:     { DEPOSIT: 65, BOND: 25, MIXED: 10, DOM_EQ: 0,  OVS_EQ: 0  },
+  balanced: { DEPOSIT: 40, BOND: 20, MIXED: 15, DOM_EQ: 10, OVS_EQ: 15 },
+  growth:   { DEPOSIT: 20, BOND: 10, MIXED: 10, DOM_EQ: 20, OVS_EQ: 40 },
+}
+
+// ── main component ───────────────────────────────────────────────────────────
+
 export function AssetManagement() {
   const [sub, setSub] = useState<SubTab>('current')
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3 animate-slide-up">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg glow-blue transition-transform duration-300 hover:scale-105">
           <Wallet className="w-6 h-6 text-white" />
@@ -303,7 +103,6 @@ export function AssetManagement() {
         </div>
       </div>
 
-      {/* Sub Tabs */}
       <div className="inline-flex gap-1 p-1 rounded-xl bg-white/50 border border-white/50 animate-slide-up">
         {[
           { id: 'current' as SubTab, label: '현재 운용', icon: PieIcon },
@@ -333,45 +132,77 @@ export function AssetManagement() {
   )
 }
 
-/* =========================================================
-   현재 운용
-   ========================================================= */
-function toEok(won: number): string {
-  return (won / 100_000_000).toFixed(1)
-}
+// ── 현재 운용 ────────────────────────────────────────────────────────────────
 
 function CurrentPane() {
-  const [period, setPeriod] = useState<PeriodKey>('3y')
-  const [dashboard, setDashboard] = useState<DbDashboard | null>(null)
-  const p = periods[period]
+  const [period, setPeriod] = useState<PeriodKey>('1y')
+  const [assets, setAssets] = useState<AssetsCurrent | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const [targetReturn, setTargetReturn] = useState<number | null>(null)
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetDraft, setTargetDraft] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
-    getDbDashboard(controller.signal).then(setDashboard).catch(() => {})
+    setLoading(true)
+    getAssetsCurrent(controller.signal)
+      .then((data) => {
+        setAssets(data)
+        setTargetReturn(data.target_return_rate)
+        setTargetDraft(data.target_return_rate.toFixed(1))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
     return () => controller.abort()
   }, [])
 
-  const currentReturn = CURRENT_RETURN
-  const [targetReturn, setTargetReturn] = useState(3.5)
-  const [editingTarget, setEditingTarget] = useState(false)
-  const [targetDraft, setTargetDraft] = useState('3.5')
-
-  const diff = +(currentReturn - targetReturn).toFixed(1)
+  const currentReturn = assets?.current_return_rate ?? 0
+  const targetVal = targetReturn ?? assets?.target_return_rate ?? 0
+  const diff = +(currentReturn - targetVal).toFixed(1)
   const overAchieved = diff >= 0
 
-  const commitTarget = () => {
+  const commitTarget = async () => {
     const v = parseFloat(targetDraft)
     if (!isNaN(v) && v >= 0 && v <= 100) {
-      setTargetReturn(+v.toFixed(1))
+      const rounded = +v.toFixed(1)
+      setTargetReturn(rounded)
+      setEditingTarget(false)
+      try {
+        await updateTargetReturnRate(rounded)
+      } catch {
+        // silently ignore
+      }
     } else {
-      setTargetDraft(targetReturn.toString())
+      setTargetDraft((targetReturn ?? 0).toString())
+      setEditingTarget(false)
     }
-    setEditingTarget(false)
   }
+
+  const chartData = useMemo(() => {
+    if (!assets?.return_history?.length) return []
+    const history = assets.return_history
+    const now = new Date()
+
+    const filtered: typeof history = (() => {
+      if (period === '6m') return history.slice(-6)
+      if (period === '1y') return history.slice(-12)
+      return history
+    })()
+
+    return filtered.map((h) => ({
+      name: period === '3y' ? formatQuarterLabel(h.base_date) : formatMonthLabel(h.base_date),
+      ours: h.return_rate,
+      target: targetVal,
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, period, targetVal])
+
+  const PERIOD_LABELS: Record<PeriodKey, string> = { '6m': '6개월', '1y': '1년', '3y': '3년' }
 
   return (
     <div className="space-y-6">
-      {/* Stat cards */}
+      {/* stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="glass border-0 card-interactive py-2 bg-gradient-to-br from-primary/15 to-primary/5 animate-slide-up">
           <CardContent className="p-6">
@@ -383,7 +214,7 @@ function CurrentPane() {
             <div className="mt-4">
               <p className="text-sm text-muted-foreground">총 적립금</p>
               <p className="text-3xl font-bold text-foreground mt-1">
-                {dashboard ? toEok(dashboard.funded_amount) : '-'}
+                {assets ? toEok(assets.total_amount) : '-'}
                 <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
               </p>
             </div>
@@ -396,17 +227,21 @@ function CurrentPane() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-              <div className={`flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium ${overAchieved ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}`}>
-                <ArrowUpRight className={`w-3 h-3 ${overAchieved ? '' : 'rotate-90'}`} />
-                <span>{overAchieved ? '+' : ''}{diff}%p</span>
-              </div>
+              {assets && (
+                <div className={`flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium ${overAchieved ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}`}>
+                  <ArrowUpRight className={`w-3 h-3 ${overAchieved ? '' : 'rotate-90'}`} />
+                  <span>{overAchieved ? '+' : ''}{diff}%p</span>
+                </div>
+              )}
             </div>
             <div className="mt-4">
               <p className="text-sm text-muted-foreground">당기 수익률</p>
-              <p className="text-3xl font-bold text-foreground mt-1">{currentReturn}%</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                목표 대비 {Math.abs(diff)}%p {overAchieved ? '초과 달성' : '미달'}
-              </p>
+              <p className="text-3xl font-bold text-foreground mt-1">{loading ? '-' : `${currentReturn}%`}</p>
+              {assets && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  목표 대비 {Math.abs(diff)}%p {overAchieved ? '초과 달성' : '미달'}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -419,7 +254,7 @@ function CurrentPane() {
               </div>
               {!editingTarget && (
                 <button
-                  onClick={() => { setTargetDraft(targetReturn.toString()); setEditingTarget(true) }}
+                  onClick={() => { setTargetDraft((targetReturn ?? 0).toFixed(1)); setEditingTarget(true) }}
                   className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80 transition-all"
                 >
                   <Pencil className="w-3 h-3" />
@@ -455,7 +290,7 @@ function CurrentPane() {
                       onBlur={commitTarget}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') commitTarget()
-                        if (e.key === 'Escape') { setTargetDraft(targetReturn.toString()); setEditingTarget(false) }
+                        if (e.key === 'Escape') { setTargetDraft((targetReturn ?? 0).toFixed(1)); setEditingTarget(false) }
                       }}
                       className="w-16 text-3xl font-bold text-foreground text-center bg-transparent border-b-2 border-primary/40 focus:border-primary outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       aria-label="목표 수익률 입력"
@@ -476,7 +311,7 @@ function CurrentPane() {
                   </button>
                 </div>
               ) : (
-                <p className="text-3xl font-bold text-foreground mt-1">{targetReturn}%</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{loading ? '-' : `${targetVal}%`}</p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
                 {editingTarget ? 'Enter로 저장 · Esc로 취소' : '연간 운용 목표'}
@@ -487,7 +322,7 @@ function CurrentPane() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Return trend */}
+        {/* 수익률 추이 */}
         <Card className="glass border-0 animate-slide-up">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -498,7 +333,7 @@ function CurrentPane() {
                 수익률 추이
               </CardTitle>
               <div className="inline-flex rounded-lg bg-white/50 border border-white/50 p-0.5">
-                {(Object.keys(periods) as PeriodKey[]).map((k) => (
+                {(['6m', '1y', '3y'] as PeriodKey[]).map((k) => (
                   <button
                     key={k}
                     onClick={() => setPeriod(k)}
@@ -506,7 +341,7 @@ function CurrentPane() {
                       period === k ? 'bg-gradient-to-r from-primary to-accent text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {periods[k].label}
+                    {PERIOD_LABELS[k]}
                   </button>
                 ))}
               </div>
@@ -515,30 +350,27 @@ function CurrentPane() {
           <CardContent>
             <div className="flex flex-wrap items-center gap-4 mb-3">
               <Legendish color="#2563eb" label="우리 회사" />
-              <Legendish dashed label={`목표 ${targetReturn}%`} />
+              <Legendish dashed label={`목표 ${targetVal}%`} />
             </div>
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={p.data} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                  <YAxis domain={[1.5, 5.5]} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }}
-                    formatter={(v: number) => `${v}%`}
+                    formatter={(v) => [`${v}%`]}
                   />
                   <Line type="monotone" dataKey="ours" name="우리 회사" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: '#2563eb' }} />
-                  <ReferenceLine y={targetReturn} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 4" />
+                  <ReferenceLine y={targetVal} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 4" />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-            <div className="mt-3 p-3 rounded-xl bg-white/50 border border-white/50 text-xs text-muted-foreground leading-relaxed">
-              {p.summary}
             </div>
           </CardContent>
         </Card>
 
-        {/* Portfolio */}
+        {/* 자산 포트폴리오 */}
         <Card className="glass border-0 animate-slide-up">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -548,7 +380,9 @@ function CurrentPane() {
                 </div>
                 자산 포트폴리오
               </CardTitle>
-              <span className="text-xs text-muted-foreground">총 {dashboard ? toEok(dashboard.funded_amount) : '-'}억</span>
+              <span className="text-xs text-muted-foreground">
+                총 {assets ? toEok(assets.total_amount) : '-'}억
+              </span>
             </div>
           </CardHeader>
           <CardContent>
@@ -556,40 +390,51 @@ function CurrentPane() {
               <div className="w-[130px] h-[130px] shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={portfolio} dataKey="pct" nameKey="name" innerRadius={40} outerRadius={62} paddingAngle={2} stroke="none">
-                      {portfolio.map((d) => (
-                        <Cell key={d.name} fill={d.color} />
+                    <Pie
+                      data={assets?.portfolio_by_class ?? []}
+                      dataKey="pct"
+                      nameKey="class_name"
+                      innerRadius={40}
+                      outerRadius={62}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {(assets?.portfolio_by_class ?? []).map((d) => (
+                        <Cell key={d.class_code} fill={d.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
+                    <Tooltip formatter={(v) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
               <div className="flex-1">
-                {portfolio.map((d) => (
-                  <div key={d.name} className="py-2 border-b border-white/40 last:border-0">
+                {(assets?.portfolio_by_class ?? []).map((d) => (
+                  <div key={d.class_code} className="py-2 border-b border-white/40 last:border-0">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 text-foreground">
                         <span className="w-2.5 h-2.5 rounded shrink-0" style={{ background: d.color }} />
-                        {d.name}
+                        {d.class_name}
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="font-semibold text-foreground w-9 text-right">{d.pct}%</span>
-                        <span className="text-xs text-muted-foreground w-12 text-right">{d.amt}</span>
+                        <span className="text-xs text-muted-foreground w-14 text-right">{toEok(d.amount)}억</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="mt-3 p-3 rounded-xl bg-white/50 border border-white/50 text-xs text-muted-foreground">
-              위험자산 비중 <strong className="text-foreground">28%</strong> · 법정 한도 70% 대비 여유 충분
-            </div>
+            {assets && (
+              <div className="mt-3 p-3 rounded-xl bg-white/50 border border-white/50 text-xs text-muted-foreground">
+                위험자산 비중 <strong className="text-foreground">{assets.risk_asset_ratio}%</strong> · 법정 한도 70% 대비{' '}
+                {assets.risk_asset_ratio <= 70 ? '여유 충분' : <span className="text-red-500 font-semibold">한도 초과</span>}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* 유형별 운용 상품 (full width) */}
+      {/* 유형별 운용 상품 */}
       <Card className="glass border-0 animate-slide-up" style={{ animationDelay: '200ms' }}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -599,9 +444,9 @@ function CurrentPane() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {holdings.map((group) => (
+            {(assets?.holdings_by_class ?? []).map((group) => (
               <div
-                key={group.className}
+                key={group.class_code}
                 className="rounded-2xl border-2 bg-white/40 overflow-hidden"
                 style={{ borderColor: group.color }}
               >
@@ -610,20 +455,20 @@ function CurrentPane() {
                   style={{ background: `${group.color}1a` }}
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: group.color }} />
-                  <span className="text-sm font-semibold text-foreground truncate">{group.className}</span>
-                  <span className="ml-auto text-xs text-muted-foreground shrink-0">{group.items.length}개</span>
+                  <span className="text-sm font-semibold text-foreground truncate">{group.class_name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground shrink-0">{group.products.length}개</span>
                 </div>
                 <div className="p-2.5 space-y-2">
-                  {group.items.map((item) => (
+                  {group.products.map((item) => (
                     <div
-                      key={item.product}
+                      key={item.product_name}
                       className="px-3 py-2.5 rounded-xl border border-border bg-white/70"
                     >
-                      <p className="text-sm text-foreground leading-snug">{item.product}</p>
+                      <p className="text-sm text-foreground leading-snug">{item.product_name}</p>
                       <p className="text-xs text-muted-foreground mb-1">{item.provider}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-emerald-600">+{item.ret}%</span>
-                        <span className="text-xs text-muted-foreground">{item.amt}</span>
+                        <span className="text-xs font-medium text-emerald-600">+{item.return_rate}%</span>
+                        <span className="text-xs text-muted-foreground">{toEok(item.amount)}억</span>
                       </div>
                     </div>
                   ))}
@@ -633,7 +478,6 @@ function CurrentPane() {
           </div>
         </CardContent>
       </Card>
-
     </div>
   )
 }
@@ -651,25 +495,51 @@ function Legendish({ color, dashed, label }: { color?: string; dashed?: boolean;
   )
 }
 
-/* =========================================================
-   자산운용 시뮬레이션
-   ========================================================= */
+// ── 자산운용 시뮬레이션 ──────────────────────────────────────────────────────
+
 function SimPane() {
-  const [weights, setWeights] = useState<Weights>({ deposit: 50, bond: 20, mixed: 10, domEq: 8, ovsEq: 12 })
-  const [selected, setSelected] = useState<Selected>({ deposit: ['d1'], bond: ['b1'], mixed: ['m1'], domEq: ['k1'], ovsEq: ['o1', 'o2'] })
+  const [classes, setClasses] = useState<AssetClassOption[]>([])
+  const [weights, setWeights] = useState<Weights>({})
+  const [selected, setSelected] = useState<Selected>({})
   const [open, setOpen] = useState<Record<string, boolean>>({})
 
-    /* 저장된 포트폴리오 */
-  const [saved, setSaved] = useState<SavedPortfolio[]>([])
+  const [saved, setSaved] = useState<Simulation[]>([])
   const [saveOpen, setSaveOpen] = useState(false)
   const [loadOpen, setLoadOpen] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const loadRef = useRef<HTMLDivElement>(null)
 
+  // load options + saved list
   useEffect(() => {
-    setSaved(loadPortfolios())
+    const controller = new AbortController()
+    getSimulationOptions(controller.signal).then((opts) => {
+      setClasses(opts.classes)
+      const initWeights: Weights = {}
+      const initSelected: Selected = {}
+      opts.classes.forEach((cls) => {
+        initWeights[cls.class_code] = 0
+        initSelected[cls.class_code] = []
+      })
+      initWeights['DEPOSIT'] = 50
+      initWeights['BOND'] = 20
+      initWeights['MIXED'] = 10
+      initWeights['DOM_EQ'] = 8
+      initWeights['OVS_EQ'] = 12
+      // default product: first product in each class
+      opts.classes.forEach((cls) => {
+        if (cls.products.length > 0) {
+          initSelected[cls.class_code] = [cls.products[0].id]
+        }
+      })
+      setWeights(initWeights)
+      setSelected(initSelected)
+    }).catch(() => {})
+
+    listSimulations(controller.signal).then(setSaved).catch(() => {})
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -690,98 +560,164 @@ function SimPane() {
     return () => clearTimeout(t)
   }, [toast])
 
-  const savePortfolio = () => {
-    const name = nameDraft.trim() || `포트폴리오 ${saved.length + 1}`
-    const entry: SavedPortfolio = {
-      id: `pf_${Date.now()}`,
-      name,
-      weights: { ...weights },
-      selected: JSON.parse(JSON.stringify(selected)),
-      savedAt: Date.now(),
-    }
-    const next = [entry, ...saved]
-    setSaved(next)
-    persistPortfolios(next)
-    setActiveId(entry.id)
-    setNameDraft('')
-    setSaveOpen(false)
-    setToast(`'${name}' 저장 완료`)
-  }
-
-  const loadPortfolio = (pf: SavedPortfolio) => {
-    setWeights({ ...pf.weights })
-    setSelected(JSON.parse(JSON.stringify(pf.selected)))
-    setActiveId(pf.id)
-    setLoadOpen(false)
-    setToast(`'${pf.name}' 불러옴`)
-  }
-
-  const deletePortfolio = (id: string) => {
-    const next = saved.filter((p) => p.id !== id)
-    setSaved(next)
-    persistPortfolios(next)
-    if (activeId === id) setActiveId(null)
-  }
-
-
-
-  const classRet = (key: string) => {
-    const sel = selected[key] || []
-    const prods = CLASSES[key].products.filter((p) => sel.includes(p.id))
+  const classReturnByCode = (code: string) => {
+    const cls = classes.find((c) => c.class_code === code)
+    if (!cls) return null
+    const selIds = selected[code] || []
+    const prods = cls.products.filter((p) => selIds.includes(p.id))
     if (!prods.length) return null
-    return prods.reduce((s, p) => s + p.ret, 0) / prods.length
+    return prods.reduce((s, p) => s + p.return_rate, 0) / prods.length
   }
 
   const total = Object.values(weights).reduce((s, v) => s + v, 0)
-  const riskSum = Object.entries(weights).reduce((s, [k, v]) => s + (CLASSES[k].risk ? v : 0), 0)
+  const riskSum = classes.reduce((s, cls) => s + (cls.is_risk ? (weights[cls.class_code] || 0) : 0), 0)
 
   const expReturn = useMemo(() => {
     let wRetSum = 0
     let wUsed = 0
-    Object.entries(weights).forEach(([k, w]) => {
+    classes.forEach((cls) => {
+      const w = weights[cls.class_code] || 0
       if (!w) return
-      const r = classRet(k)
+      const r = classReturnByCode(cls.class_code)
       if (r === null) return
       wRetSum += r * w
       wUsed += w
     })
     return wUsed > 0 ? (wRetSum / wUsed).toFixed(1) + '%' : '—'
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weights, selected])
+  }, [weights, selected, classes])
 
-  const pieData = useMemo(() => {
-    const out: { name: string; value: number; color: string }[] = []
-    Object.entries(weights).forEach(([k, w]) => {
+  const expReturnNum = useMemo(() => {
+    let wRetSum = 0
+    let wUsed = 0
+    classes.forEach((cls) => {
+      const w = weights[cls.class_code] || 0
       if (!w) return
-      const prods = CLASSES[k].products.filter((p) => (selected[k] || []).includes(p.id))
-      if (!prods.length) return
-      const each = w / prods.length
-      prods.forEach((p, i) => {
-        out.push({ name: p.name, value: +each.toFixed(1), color: shade(CLASSES[k].color, i * 22) })
-      })
+      const r = classReturnByCode(cls.class_code)
+      if (r === null) return
+      wRetSum += r * w
+      wUsed += w
     })
-    return out
-  }, [weights, selected])
+    return wUsed > 0 ? wRetSum / wUsed : 0
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weights, selected, classes])
+
+  // Pie shows only asset class weights (not individual products)
+  const pieData = useMemo(() => {
+    return classes
+      .map((cls) => {
+        const w = weights[cls.class_code] || 0
+        if (!w) return null
+        const selIds = selected[cls.class_code] || []
+        if (!selIds.length) return null
+        return { name: cls.class_name, value: w, color: cls.color }
+      })
+      .filter(Boolean) as { name: string; value: number; color: string }[]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weights, selected, classes])
 
   const concMsgs = useMemo(() => {
     const msgs: string[] = []
-    Object.entries(weights).forEach(([k, w]) => {
-      if (CLASSES[k].risk && CLASSES[k].multi && w >= 15 && (selected[k] || []).length <= 1) {
-        msgs.push(`${CLASSES[k].name} ${w}% 집중`)
+    classes.forEach((cls) => {
+      const w = weights[cls.class_code] || 0
+      if (cls.is_risk && cls.allow_multi && w >= 15 && (selected[cls.class_code] || []).length <= 1) {
+        msgs.push(`${cls.class_name} ${w}% 집중`)
       }
     })
     return msgs
-  }, [weights, selected])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weights, selected, classes])
 
-  const updateWeight = (key: string, val: number) => setWeights((w) => ({ ...w, [key]: val }))
-  const toggleOpen = (key: string) => setOpen((o) => ({ ...o, [key]: !o[key] }))
-  const toggleProd = (key: string, pid: string, multi: boolean) => {
+  const buildSimItems = () => {
+    const items: { asset_class_id: number; product_master_id: number | null; weight_pct: number; applied_return: number }[] = []
+    classes.forEach((cls) => {
+      const w = weights[cls.class_code] || 0
+      if (!w) return
+      const selIds = selected[cls.class_code] || []
+      if (!selIds.length) return
+      const prods = cls.products.filter((p) => selIds.includes(p.id))
+      const each = prods.length > 0 ? w / prods.length : w
+      prods.forEach((p) => {
+        items.push({
+          asset_class_id: cls.id,
+          product_master_id: p.id,
+          weight_pct: +each.toFixed(2),
+          applied_return: +p.return_rate.toFixed(2),
+        })
+      })
+    })
+    return items
+  }
+
+  const handleSave = async () => {
+    const name = nameDraft.trim() || `포트폴리오 ${saved.length + 1}`
+    setSaving(true)
+    try {
+      const result = await saveSimulation({
+        simulation_name: name,
+        preset_type: 'CUSTOM',
+        expected_return_rate: +expReturnNum.toFixed(2),
+        risk_asset_ratio: +riskSum.toFixed(2),
+        items: buildSimItems(),
+      })
+      setSaved((prev) => [result, ...prev])
+      setActiveId(result.id)
+      setNameDraft('')
+      setSaveOpen(false)
+      setToast(`'${name}' 저장 완료`)
+    } catch {
+      setToast('저장에 실패했습니다')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleLoad = (sim: Simulation) => {
+    const newWeights: Weights = {}
+    const newSelected: Selected = {}
+    classes.forEach((cls) => { newWeights[cls.class_code] = 0; newSelected[cls.class_code] = [] })
+
+    // aggregate weights by class_code and collect product IDs
+    const classWeights: Record<string, number> = {}
+    const classProducts: Record<string, number[]> = {}
+    sim.items.forEach((item) => {
+      classWeights[item.class_code] = (classWeights[item.class_code] || 0) + item.weight_pct
+      if (item.product_master_id != null) {
+        classProducts[item.class_code] = classProducts[item.class_code] || []
+        if (!classProducts[item.class_code].includes(item.product_master_id)) {
+          classProducts[item.class_code].push(item.product_master_id)
+        }
+      }
+    })
+    Object.assign(newWeights, classWeights)
+    Object.assign(newSelected, classProducts)
+
+    setWeights(newWeights)
+    setSelected(newSelected)
+    setActiveId(sim.id)
+    setLoadOpen(false)
+    setToast(`'${sim.simulation_name}' 불러옴`)
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteSimulation(id)
+      setSaved((prev) => prev.filter((s) => s.id !== id))
+      if (activeId === id) setActiveId(null)
+    } catch {
+      setToast('삭제에 실패했습니다')
+    }
+  }
+
+  const updateWeight = (code: string, val: number) => setWeights((w) => ({ ...w, [code]: val }))
+  const toggleOpen = (code: string) => setOpen((o) => ({ ...o, [code]: !o[code] }))
+  const toggleProd = (code: string, pid: number, multi: boolean) => {
     setSelected((s) => {
       if (multi) {
-        const cur = s[key] || []
-        return { ...s, [key]: cur.includes(pid) ? cur.filter((x) => x !== pid) : [...cur, pid] }
+        const cur = s[code] || []
+        return { ...s, [code]: cur.includes(pid) ? cur.filter((x) => x !== pid) : [...cur, pid] }
       }
-      return { ...s, [key]: [pid] }
+      return { ...s, [code]: [pid] }
     })
   }
   const normalize = () => {
@@ -793,25 +729,29 @@ function SimPane() {
     next[keys[0]] += diff
     setWeights(next)
   }
-  const applyPreset = (name: keyof typeof PRESETS) => {
-    setWeights({ ...PRESETS[name].weights })
-    setSelected(JSON.parse(JSON.stringify(PRESETS[name].selected)))
+  const applyPreset = (name: keyof typeof PRESETS_BY_CODE) => {
+    const pw = PRESETS_BY_CODE[name]
+    const newWeights: Weights = {}
+    classes.forEach((cls) => { newWeights[cls.class_code] = pw[cls.class_code] ?? 0 })
+    setWeights(newWeights)
+    // default product per class
+    const newSelected: Selected = {}
+    classes.forEach((cls) => {
+      newSelected[cls.class_code] = cls.products.length > 0 ? [cls.products[0].id] : []
+    })
+    setSelected(newSelected)
   }
 
   return (
     <div className="space-y-4">
-      {/* Top: expected return + adjusted pie */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="glass border-0 bg-gradient-to-br from-primary/15 to-accent/5 animate-slide-up">
           <CardContent className="p-6 h-full flex flex-col justify-center">
             <p className="text-sm text-muted-foreground mb-2">예상 연 수익률</p>
             <div className="flex items-end gap-3 flex-wrap">
               <p className="text-5xl font-bold gradient-text leading-none">{expReturn}</p>
-              <p className="text-sm text-muted-foreground leading-none pb-1">
-                현재 <span className="font-semibold text-foreground">{CURRENT_RETURN}%</span>
-              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">선택 상품 3년 평균 가중 기준 · 현재 운용 수익률과 비교</p>
+            <p className="text-xs text-muted-foreground mt-3">선택 상품 연 수익률 가중 기준</p>
           </CardContent>
         </Card>
 
@@ -855,18 +795,19 @@ function SimPane() {
                         placeholder="포트폴리오 이름"
                         onChange={(e) => setNameDraft(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') savePortfolio()
+                          if (e.key === 'Enter') handleSave()
                           if (e.key === 'Escape') setSaveOpen(false)
                         }}
                         className="w-full px-3 py-2 text-sm rounded-lg border border-white/60 bg-white/70 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/40 mb-2"
                       />
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={savePortfolio}
-                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all"
+                          onClick={handleSave}
+                          disabled={saving}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all disabled:opacity-60"
                         >
                           <Check className="w-3.5 h-3.5" />
-                          저장
+                          {saving ? '저장 중...' : '저장'}
                         </button>
                         <button
                           onClick={() => setSaveOpen(false)}
@@ -882,33 +823,32 @@ function SimPane() {
                     <div className="absolute top-full right-0 mt-1 z-30 w-72 p-3 rounded-xl border border-white/60 bg-white/95 backdrop-blur shadow-lg animate-slide-up">
                       <p className="text-xs font-medium text-foreground mb-2">저장된 포트폴리오 ({saved.length})</p>
                       {saved.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-4 text-center">
-                          저장된 포트폴리오가 없습니다.
-                        </p>
+                        <p className="text-xs text-muted-foreground py-4 text-center">저장된 포트폴리오가 없습니다.</p>
                       ) : (
                         <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                          {saved.map((pf) => {
-                            const isActive = pf.id === activeId
+                          {saved.map((sim) => {
+                            const isActive = sim.id === activeId
                             return (
                               <div
-                                key={pf.id}
+                                key={sim.id}
                                 className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
                                   isActive ? 'border-primary/50 bg-primary/10' : 'border-white/50 bg-white/50'
                                 }`}
                               >
-                                <button onClick={() => loadPortfolio(pf)} className="flex-1 min-w-0 text-left">
+                                <button onClick={() => handleLoad(sim)} className="flex-1 min-w-0 text-left">
                                   <p className="text-xs font-medium text-foreground truncate">
-                                    {pf.name}
+                                    {sim.simulation_name}
                                     {isActive && <span className="ml-1.5 text-[9px] text-primary font-semibold">적용됨</span>}
                                   </p>
                                   <p className="text-[10px] text-muted-foreground">
-                                    {new Date(pf.savedAt).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}
+                                    {new Date(sim.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}
+                                    {' · '}수익 {sim.expected_return_rate.toFixed(1)}%
                                   </p>
                                 </button>
                                 <button
-                                  onClick={() => deletePortfolio(pf.id)}
+                                  onClick={() => handleDelete(sim.id)}
                                   className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-white/70 transition-all shrink-0"
-                                  aria-label={`${pf.name} 삭제`}
+                                  aria-label={`${sim.simulation_name} 삭제`}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -932,7 +872,7 @@ function SimPane() {
                       <Cell key={i} fill={d.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
+                  <Tooltip formatter={(v) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
                   <Legend
                     layout="vertical"
                     align="right"
@@ -949,11 +889,10 @@ function SimPane() {
               </ResponsiveContainer>
             </div>
           </CardContent>
-
         </Card>
       </div>
 
-      {/* Composition */}
+      {/* 포트폴리오 구성 */}
       <Card className="glass border-0 animate-slide-up">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -964,11 +903,7 @@ function SimPane() {
               포트폴리오 구성
             </CardTitle>
             <div className="flex gap-2">
-              {([
-                ['safe', '안정형'],
-                ['balanced', '균형형'],
-                ['growth', '수익추구형'],
-              ] as const).map(([key, label]) => (
+              {([['safe', '안정형'], ['balanced', '균형형'], ['growth', '수익추구형']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => applyPreset(key)}
@@ -1015,21 +950,21 @@ function SimPane() {
           )}
 
           <div className="space-y-3">
-            {Object.entries(CLASSES).map(([key, cls]) => {
-              const w = weights[key] || 0
-              const sel = selected[key] || []
+            {classes.map((cls) => {
+              const w = weights[cls.class_code] || 0
+              const sel = selected[cls.class_code] || []
               const selProds = cls.products.filter((p) => sel.includes(p.id))
-              const cRet = classRet(key)
-              const isOpen = open[key]
+              const cRet = classReturnByCode(cls.class_code)
+              const isOpen = open[cls.class_code]
               const selNames = selProds.length ? selProds.map((p) => p.name).join(', ') : '상품 미선택'
-              const splitTxt = cls.multi && selProds.length > 1 ? ` · ${selProds.length}개 분산 (각 ${(w / selProds.length).toFixed(1)}%)` : ''
+              const splitTxt = cls.allow_multi && selProds.length > 1 ? ` · ${selProds.length}개 분산 (각 ${(w / selProds.length).toFixed(1)}%)` : ''
               return (
-                <div key={key} className="rounded-xl border border-white/50 bg-white/40 p-3">
+                <div key={cls.class_code} className="rounded-xl border border-white/50 bg-white/40 p-3">
                   <div className="grid grid-cols-[minmax(110px,140px)_1fr_auto] items-start gap-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground pt-1">
                       <span className="w-2.5 h-2.5 rounded shrink-0" style={{ background: cls.color }} />
-                      {cls.name}
-                      {cls.risk && (
+                      {cls.class_name}
+                      {cls.is_risk && (
                         <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-red-100 text-red-500">위험</span>
                       )}
                     </div>
@@ -1040,8 +975,8 @@ function SimPane() {
                         max={100}
                         step={1}
                         value={w}
-                        onChange={(e) => updateWeight(key, parseInt(e.target.value))}
-                        aria-label={`${cls.name} 비중`}
+                        onChange={(e) => updateWeight(cls.class_code, parseInt(e.target.value))}
+                        aria-label={`${cls.class_name} 비중`}
                         className="cd-slider"
                         style={{ '--val': `${w}%`, '--color': cls.color } as CSSProperties}
                       />
@@ -1059,17 +994,16 @@ function SimPane() {
 
                   <div className="mt-3 pt-3 border-t border-white/50">
                     {w === 0 ? (
-                      <p className="text-xs text-muted-foreground">{cls.name} 상품의 비중이 0입니다.</p>
+                      <p className="text-xs text-muted-foreground">{cls.class_name} 상품의 비중이 0입니다.</p>
                     ) : (
                       <>
-                        <button onClick={() => toggleOpen(key)} className="w-full flex items-center justify-between text-xs text-muted-foreground">
+                        <button onClick={() => toggleOpen(cls.class_code)} className="w-full flex items-center justify-between text-xs text-muted-foreground">
                           <span className="text-left">{selNames}{splitTxt}</span>
                           <span className="flex items-center gap-1 text-primary font-medium shrink-0 ml-2">
                             {isOpen ? '접기' : '상품 변경'}
                             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                           </span>
                         </button>
-
                         {isOpen && (
                           <div className="mt-2 space-y-0.5">
                             {cls.products.map((p) => {
@@ -1077,10 +1011,10 @@ function SimPane() {
                               return (
                                 <label key={p.id} className="flex items-center gap-2.5 py-1.5 text-xs border-b border-white/40 last:border-0 cursor-pointer">
                                   <input
-                                    type={cls.multi ? 'checkbox' : 'radio'}
-                                    name={`sel-${key}`}
+                                    type={cls.allow_multi ? 'checkbox' : 'radio'}
+                                    name={`sel-${cls.class_code}`}
                                     checked={checked}
-                                    onChange={() => toggleProd(key, p.id, cls.multi)}
+                                    onChange={() => toggleProd(cls.class_code, p.id, cls.allow_multi)}
                                     className="w-3.5 h-3.5 accent-primary cursor-pointer shrink-0"
                                   />
                                   <span className="flex-1 text-foreground">{p.name}</span>
@@ -1091,11 +1025,11 @@ function SimPane() {
                                       {p.tag}
                                     </span>
                                   )}
-                                  <span className="w-12 text-right font-semibold text-emerald-600">+{p.ret.toFixed(1)}%</span>
+                                  <span className="w-12 text-right font-semibold text-emerald-600">+{p.return_rate.toFixed(1)}%</span>
                                 </label>
                               )
                             })}
-                            {cls.multi && (
+                            {cls.allow_multi && (
                               <p className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1.5">
                                 <Info className="w-3 h-3" />
                                 복수 선택 시 자산군 비중을 균등 분산합니다
@@ -1111,7 +1045,6 @@ function SimPane() {
             })}
           </div>
 
-          {/* Total bar */}
           <div className="flex items-center justify-between mt-4 p-3 rounded-xl bg-white/50 border border-white/50 text-sm">
             <span className="text-muted-foreground">
               합계 <span className={total === 100 ? 'text-emerald-600 font-semibold' : 'text-destructive font-semibold'}>{total}%</span>
@@ -1121,22 +1054,15 @@ function SimPane() {
               100%로 자동 조정
             </button>
           </div>
-
         </CardContent>
       </Card>
 
-      <button className="w-full py-3 rounded-xl border border-primary text-primary text-sm font-medium hover:bg-primary/10 transition-all duration-300">
-        이 구성으로 추천 의견 받기 ↗
-      </button>
-
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-foreground text-background text-sm font-medium shadow-lg animate-slide-up">
           <Check className="w-4 h-4 text-emerald-400" />
           {toast}
         </div>
       )}
-
     </div>
   )
 }

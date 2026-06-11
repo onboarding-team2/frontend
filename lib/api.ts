@@ -577,3 +577,159 @@ export async function getDbPortfolio(signal?: AbortSignal): Promise<DbPortfolio>
   if (!res.ok) throw new Error(await readError(res, 'DB 포트폴리오 조회 실패'))
   return res.json()
 }
+
+// ─── DB Assets API ─────────────────────────────────────────────────────────
+
+export type ReturnHistoryPoint = {
+  base_date: string
+  return_rate: number
+}
+
+export type AssetClassPortfolio = {
+  class_code: string
+  class_name: string
+  amount: number
+  pct: number
+  color: string
+}
+
+export type ProductHolding = {
+  product_name: string
+  provider: string
+  return_rate: number
+  amount: number
+}
+
+export type AssetClassHoldings = {
+  class_code: string
+  class_name: string
+  color: string
+  products: ProductHolding[]
+}
+
+export type AssetsCurrent = {
+  current_return_rate: number
+  target_return_rate: number
+  return_history: ReturnHistoryPoint[]
+  portfolio_by_class: AssetClassPortfolio[]
+  holdings_by_class: AssetClassHoldings[]
+  total_amount: number
+  risk_asset_ratio: number
+}
+
+export async function getAssetsCurrent(signal?: AbortSignal): Promise<AssetsCurrent> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/current`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '자산 현황 조회 실패'))
+  return res.json()
+}
+
+export async function updateTargetReturnRate(rate: number): Promise<number> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/target-rate`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify({ target_return_rate: rate }),
+  })
+  if (!res.ok) throw new Error(await readError(res, '목표 수익률 업데이트 실패'))
+  return res.json()
+}
+
+export type ProductOption = {
+  id: number
+  name: string
+  return_rate: number
+  tag: string | null
+  provider: string
+}
+
+export type AssetClassOption = {
+  id: number
+  class_code: string
+  class_name: string
+  is_risk: boolean
+  allow_multi: boolean
+  avg_return_3y: number
+  color: string
+  products: ProductOption[]
+}
+
+export type SimulationOptions = {
+  classes: AssetClassOption[]
+}
+
+export async function getSimulationOptions(signal?: AbortSignal): Promise<SimulationOptions> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation-options`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 옵션 조회 실패'))
+  return res.json()
+}
+
+export type SimulationItemDto = {
+  asset_class_id: number
+  product_master_id: number | null
+  weight_pct: number
+  applied_return: number
+}
+
+export type SimulationSaveRequest = {
+  simulation_name: string
+  preset_type: string
+  expected_return_rate: number
+  risk_asset_ratio: number
+  items: SimulationItemDto[]
+}
+
+export type SimulationItemResponse = {
+  asset_class_id: number
+  class_code: string
+  class_name: string
+  product_master_id: number | null
+  product_name: string | null
+  weight_pct: number
+  applied_return: number
+}
+
+export type Simulation = {
+  id: number
+  simulation_name: string
+  expected_return_rate: number
+  risk_asset_ratio: number
+  preset_type: string
+  status: string
+  created_at: string
+  items: SimulationItemResponse[]
+}
+
+export async function saveSimulation(data: SimulationSaveRequest): Promise<Simulation> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 저장 실패'))
+  return res.json()
+}
+
+export async function listSimulations(signal?: AbortSignal): Promise<Simulation[]> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 목록 조회 실패'))
+  return res.json()
+}
+
+export async function deleteSimulation(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 삭제 실패'))
+}
