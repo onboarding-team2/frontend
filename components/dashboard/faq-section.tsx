@@ -60,14 +60,14 @@ export function FaqSection({ planType }: FaqSectionProps) {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-foreground">자주 묻는 질문 (FAQ)</h2>
-            <p className="text-muted-foreground">{planType}형 퇴직연금 운영 시 자주 묻는 질문을 모았습니다</p>
+            <p className="text-muted-foreground">{planType}형 퇴직연금 운영 시 주요 문의사항을 안내드립니다.</p>
           </div>
         </div>
       </div>
 
       {/* Search */}
       <Card className="glass border-0 animate-slide-up">
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="px-4 space-y-3">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <Input
@@ -75,25 +75,26 @@ export function FaqSection({ planType }: FaqSectionProps) {
               placeholder="궁금한 내용을 검색하세요"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-11 h-12 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
+              className="pl-11 h-12 bg-white/50 border-white/50 border border-blue-100/50 rounded-xl input-glow focus:bg-white/80 transition-all"
             />
           </div>
           <button
             onClick={openChat}
-            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-all group self-start"
+            className="flex items-center gap-2 text-sm px-3 py-2 border-slate-500/10 rounded-lg bg-primary/5 hover:bg-primary/10 transition-all group self-start"
           >
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-muted-foreground">원하는 답변을 못 찾으셨다면</span>
+            <span className="text-muted-foreground">원하는 답변을 찾지 못하셨다면?</span>
+            <br />
             <span className="text-primary font-semibold">AI 챗봇에게 물어보기</span>
             <ChevronRight className="w-4 h-4 text-primary group-hover:translate-x-0.5 transition-transform" />
           </button>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 pt-4">
         {/* Categories Sidebar */}
-        <Card className="glass border-0 lg:col-span-1 h-fit animate-slide-up">
-          <CardHeader>
+        <Card className="glass border-0 lg:col-span-1 h-fit animate-slide-up gap-0 p-2">
+          <CardHeader className="p-5 pb-1">
             <CardTitle className="text-lg flex items-center gap-2">
               <Folder className="w-5 h-5 text-primary" />
               카테고리
@@ -149,7 +150,7 @@ export function FaqSection({ planType }: FaqSectionProps) {
                   <Card key={faq.id} className="glass border-0 card-interactive overflow-hidden py-3 gap-0">
                     <button
                       onClick={() => toggle(faq.id)}
-                      className="w-full text-left p-5 flex items-start gap-4"
+                      className="w-full text-left p-5 flex items-start gap-4 py-3"
                       aria-expanded={isOpen}
                     >
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0 transition-transform duration-300">
@@ -175,7 +176,7 @@ export function FaqSection({ planType }: FaqSectionProps) {
                       }`}
                     >
                       <div className="overflow-hidden">
-                        <div className="px-5 pb-5 pl-[4.5rem]">
+                        <div className="px-5 pb-2 pl-[4.5rem]">
                           <div className="flex items-start gap-3 rounded-xl bg-white/40 p-4">
                             <span className="text-accent font-bold shrink-0">A</span>
                             <p className="text-sm text-muted-foreground leading-relaxed break-keep">{faq.answer}</p>

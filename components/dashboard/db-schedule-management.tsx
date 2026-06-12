@@ -1505,7 +1505,7 @@ export function ScheduleManagement() {
         {viewMode === 'list' && (
           <div className="flex flex-1 gap-3 flex-wrap items-center">
             <div className="relative flex-1 min-w-52">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
               <input
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border/70 bg-white/80 backdrop-blur-sm text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                 placeholder="일정명, 내용 검색..."
