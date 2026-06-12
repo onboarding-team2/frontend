@@ -1,7 +1,6 @@
 export type ScheduleType = 'DC' | 'DB' | '계약갱신' | '운용지시' | '정기점검' | '신고의무'
 export type TargetType = '기업' | '가입자'
 export type ScheduleStatus = '예정' | '완료' | '지연'
-export type SchedulePriority = 'high' | 'medium' | 'low'
 
 export interface RelatedCompany {
   id: string
@@ -28,11 +27,10 @@ export interface Schedule {
   content: string
   type: ScheduleType
   targetType: TargetType
-  priority: SchedulePriority
   status: ScheduleStatus
+  isMandatory: boolean
   createdAt: string
   memo?: string
-  required?: boolean
   relatedCompanies?: RelatedCompany[]
   relatedSubscribers?: RelatedSubscriber[]
 }
