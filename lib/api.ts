@@ -59,6 +59,24 @@ export type CompanyProfile = {
   planType: string
 }
 
+export type CompanyDetail = {
+  // 회사 기본 정보
+  companyName: string
+  businessNumber: string
+  representativeName: string | null
+  planType: 'DC' | 'DB'
+  // 퇴직연금 정보 (공통)
+  companyAccount: string | null
+  contractDate: string | null
+  employeeCount: number | null
+  totalReserve: number | null
+  // DC 전용
+  paymentCycle: string | null
+  // DB 전용
+  fiscalMonth: number | null
+  targetReturnRate: number | null
+}
+
 export type ContributionChartItem = {
   label: string
   amount: number
@@ -87,6 +105,16 @@ export async function getCompanyProfile(signal?: AbortSignal): Promise<CompanyPr
     signal,
   })
   if (!res.ok) throw new Error(await readError(res, '기업 정보 조회 실패'))
+  return res.json()
+}
+
+export async function getCompanyDetail(signal?: AbortSignal): Promise<CompanyDetail> {
+  const res = await fetch(`${API_BASE}/company/detail`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '기업 상세 정보 조회 실패'))
   return res.json()
 }
 

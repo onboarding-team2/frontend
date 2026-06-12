@@ -95,7 +95,12 @@ export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {
         {loading ? (
           <div className="rounded-2xl p-5 animate-pulse bg-white/20 h-24" />
         ) : companyInfo ? (
-          <div className="relative rounded-2xl p-5 bg-gradient-to-br from-primary to-accent shadow-lg glow-blue overflow-hidden hover-lift">
+          <button
+            type="button"
+            onClick={() => router.push(`/pension/${companyInfo.planType.toLowerCase()}/company`)}
+            title="회사 상세 정보 보기"
+            className="w-full text-left relative rounded-2xl p-5 bg-gradient-to-br from-primary to-accent shadow-lg glow-blue overflow-hidden hover-lift cursor-pointer transition-transform active:scale-[0.98]"
+          >
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
             <div className="absolute -bottom-10 -left-6 w-28 h-28 bg-white/10 rounded-full blur-2xl" />
             <div className="relative flex items-center gap-3">
@@ -126,7 +131,7 @@ export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {
                 <p className="text-xs text-white/85 font-medium">{companyInfo.businessNumber}</p>
               </div>
             </div>
-          </div>
+          </button>
         ) : (
           <div className="glass rounded-2xl p-4 text-center text-xs text-muted-foreground">
             기업 정보 없음
