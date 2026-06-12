@@ -1083,7 +1083,7 @@ export function ScheduleManagement() {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-foreground">기일 관리</h2>
-            <p className="text-sm text-muted-foreground">도래하는 퇴직연금 일정을 관리합니다.</p>
+            <p className="text-muted-foreground"> 올해 일정은 목록에서, 전체 일정은 캘린더에서 확인하세요.</p>
           </div>
         </div>
       </div>
@@ -1100,7 +1100,7 @@ export function ScheduleManagement() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/25">
               <Calendar className="w-5 h-5 text-white" />
             </div>
-            <span className="text-sm font-medium text-muted-foreground">전체 건수</span>
+            <span className="text-sm font-medium text-muted-foreground">미완료</span>
           </div>
           <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{stats.total}</p>
         </button>
