@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import Cookies from 'js-cookie' 
+import Cookies from 'js-cookie'
+import { API_BASE } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -37,7 +38,7 @@ export default function LoginPage() {
     const brn = businessNumber.replace(/-/g, '')
 
     try {
-      const res = await fetch('http://localhost:8080/auth/login', {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brn, password }),

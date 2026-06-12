@@ -4,6 +4,7 @@ import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, Chev
 import { useRouter } from 'next/navigation'
 import type { TabType } from '@/lib/types'
 import { useEffect, useState } from 'react'
+import { getCompanyProfile } from '@/lib/api'
 
 interface SidebarProps {
   activeTab: TabType
@@ -50,19 +51,8 @@ export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {
           return
         }
 
-        const response = await fetch('http://localhost:8080/company/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setCompanyInfo(data)
-        } else {
-          console.error('기업 정보를 불러오는 데 실패했습니다.')
-        }
+        const data = await getCompanyProfile()
+        setCompanyInfo(data)
       } catch (error) {
         console.error('API 호출 에러:', error)
       } finally {
