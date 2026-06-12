@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { authHeaders } from '@/lib/api'
 import {
   X, Send, Bot, User, Sparkles, FileText, Download,
-  ChevronDown, Minimize2, Maximize2, Expand, Shrink,
+  ChevronDown, Minimize2, Maximize2,
 } from 'lucide-react'
 
 interface Message {
@@ -297,6 +297,21 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     let answer = ''
     let pendingLine = ''
     let intent: ChatIntent | undefined
+    let hasFirstChunk = false
+
+    const slowResponseTimer = window.setTimeout(() => {
+      if (!hasFirstChunk) {
+        appendBotMessage(
+          botMessageId,
+          '정확한 답변을 위해 관련 자료를 확인하고 있습니다.',
+          undefined,
+          undefined,
+          undefined,
+          intent,
+        )
+        setIsTyping(false)
+      }
+    }, 2500)
 
     try {
       const response = await fetch(CHAT_STREAM_URL, {
@@ -329,6 +344,8 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             if (answer.trim()) appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
           }
           if (payload.t) {
+            hasFirstChunk = true
+            window.clearTimeout(slowResponseTimer)
             answer += payload.t
             appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
             setIsTyping(false)
@@ -343,8 +360,19 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       if (pendingLine.trim()) {
         const payload = JSON.parse(pendingLine.trim().replace(/^data:\s*/, ''))
         if (payload.meta) intent = normalizeIntent(payload.meta.intent)
-        if (payload.t) answer += payload.t
-        appendBotMessage(botMessageId, answer, payload.sources, userMessage, undefined, intent)
+        if (payload.t) {
+          hasFirstChunk = true
+          window.clearTimeout(slowResponseTimer)
+          answer += payload.t
+        }
+        appendBotMessage(
+          botMessageId,
+          answer,
+          payload.sources,
+          userMessage,
+          undefined,
+          intent,
+        )
       }
 
       if (!answer.trim()) {
@@ -357,6 +385,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         'AI 서버와 연결하지 못했습니다. AI 서버가 실행 중인지, NEXT_PUBLIC_CHAT_STREAM_URL 설정이 맞는지 확인해주세요.',
       )
     } finally {
+      window.clearTimeout(slowResponseTimer)
       setIsTyping(false)
     }
   }
@@ -412,18 +441,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {!isMinimized && (
-              <button
-                type="button"
-                title={isExpanded ? '창 크기 줄이기' : '전체화면으로 보기'}
-                onClick={handleToggleExpanded}
-                className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
-              >
-                {isExpanded
-                  ? <Shrink className="w-4 h-4 text-muted-foreground" />
-                  : <Expand className="w-4 h-4 text-muted-foreground" />}
-              </button>
-            )}
             <button
               type="button"
               title={isMinimized ? '창 열기' : '창 접기'}
@@ -448,7 +465,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         {!isMinimized && (
           <>
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
               {messages.map((message, idx) => (
                 <div
                   key={message.id}
@@ -492,7 +509,9 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                         {message.attachments.map((attachment, i) => (
                           <a
                             key={i}
-                            href={attachment.url}
+                            href={toSafeHref(attachment.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="flex items-center gap-2 p-3 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all duration-300 text-left border border-primary/20 hover:shadow-md"
                           >
                             <FileText className="w-4 h-4 text-primary" />
@@ -592,9 +611,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                   <Send className="w-5 h-5" />
                 </Button>
               </form>
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                i-ONE Bank 기업 퇴직연금 AI 상담
-              </p>
             </div>
           </>
         )}
