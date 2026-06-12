@@ -294,7 +294,6 @@ function DetailModalContent({
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-50 text-blue-600 text-sm font-semibold hover:bg-blue-100 transition-colors"
             >
               <Pencil className="w-4 h-4" />
-              수정
             </button>
           )}
           {onComplete && schedule.status !== '완료' && (
@@ -303,7 +302,6 @@ function DetailModalContent({
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-semibold hover:bg-emerald-100 transition-colors"
             >
               <CheckCircle2 className="w-4 h-4" />
-              완료
             </button>
           )}
           {onDelete && (
@@ -312,7 +310,6 @@ function DetailModalContent({
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
-              삭제
             </button>
           )}
         </div>
@@ -1001,7 +998,7 @@ function CalendarView({
         <div className="col-span-1 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-bold text-slate-800">
-              {selectedDate} 기일 목록
+              {selectedDate} 일정
               <span className="ml-2 text-xs font-medium text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full">{selectedDateSchedules.length}건</span>
             </h4>
             <button
@@ -1192,7 +1189,7 @@ export function ScheduleManagement() {
 
   const handleEdit = async (schedule: Schedule) => {
     if (schedule.isMandatory) {
-      setToast({ message: '기본 일정의 경우 의무이행 일정은 수정 불가합니다.', type: 'error' })
+      setToast({ message: '의무이행 일정은 수정 불가합니다.', type: 'error' })
       return
     }
     const id = Number(schedule.id)
@@ -1511,7 +1508,7 @@ export function ScheduleManagement() {
         </div>
 
         {viewMode === 'list' && (
-          <div className="flex flex-1 gap-3 flex-wrap">
+          <div className="flex flex-1 gap-3 flex-wrap items-center">
             <div className="relative flex-1 min-w-52">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
@@ -1616,7 +1613,7 @@ export function ScheduleManagement() {
             }}
             onEdit={async () => {
               if (selectedSchedule.isMandatory) {
-                setToast({ message: '기본 일정의 경우 의무이행 일정은 수정 불가합니다.', type: 'error' })
+                setToast({ message: '의무이행 일정은 수정 불가합니다.', type: 'error' })
               } else {
                 const id = Number(selectedSchedule.id)
                 if (!isNaN(id)) {
