@@ -33,7 +33,6 @@ import {
   LineChart as LineIcon,
   AlertTriangle,
   Info,
-  ChevronDown,
   TrendingUp,
   Wallet,
   ArrowUpRight,
@@ -501,7 +500,6 @@ function SimPane() {
   const [classes, setClasses] = useState<AssetClassOption[]>([])
   const [weights, setWeights] = useState<Weights>({})
   const [selected, setSelected] = useState<Selected>({})
-  const [open, setOpen] = useState<Record<string, boolean>>({})
 
   const [saved, setSaved] = useState<Simulation[]>([])
   const [saveOpen, setSaveOpen] = useState(false)
@@ -510,6 +508,7 @@ function SimPane() {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [activePreset, setActivePreset] = useState<string | null>(null)
   const loadRef = useRef<HTMLDivElement>(null)
 
   // load options + saved list
@@ -709,8 +708,10 @@ function SimPane() {
     }
   }
 
-  const updateWeight = (code: string, val: number) => setWeights((w) => ({ ...w, [code]: val }))
-  const toggleOpen = (code: string) => setOpen((o) => ({ ...o, [code]: !o[code] }))
+  const updateWeight = (code: string, val: number) => {
+    setActivePreset(null)
+    setWeights((w) => ({ ...w, [code]: val }))
+  }
   const toggleProd = (code: string, pid: number, multi: boolean) => {
     setSelected((s) => {
       if (multi) {
@@ -730,35 +731,65 @@ function SimPane() {
     setWeights(next)
   }
   const applyPreset = (name: keyof typeof PRESETS_BY_CODE) => {
+    setActivePreset(name)
     const pw = PRESETS_BY_CODE[name]
     const newWeights: Weights = {}
     classes.forEach((cls) => { newWeights[cls.class_code] = pw[cls.class_code] ?? 0 })
     setWeights(newWeights)
-    // default product per class
     const newSelected: Selected = {}
     classes.forEach((cls) => {
-      newSelected[cls.class_code] = cls.products.length > 0 ? [cls.products[0].id] : []
+      if (name === 'balanced') {
+        if (cls.class_code === 'MIXED') {
+          const ids = cls.products
+            .filter((p) => p.name.includes('TDF2040') || p.name.includes('TRF3070'))
+            .map((p) => p.id)
+          newSelected[cls.class_code] = ids.length > 0 ? ids : cls.products.length > 0 ? [cls.products[0].id] : []
+        } else if (cls.class_code === 'OVS_EQ') {
+          const ids = cls.products
+            .filter((p) => p.name.includes('나스닥100') || p.name.includes('S&P500'))
+            .map((p) => p.id)
+          newSelected[cls.class_code] = ids.length > 0 ? ids : cls.products.length > 0 ? [cls.products[0].id] : []
+        } else {
+          newSelected[cls.class_code] = cls.products.length > 0 ? [cls.products[0].id] : []
+        }
+      } else if (name === 'growth') {
+        if (cls.class_code === 'DOM_EQ') {
+          const ids = cls.products
+            .filter((p) => p.name.includes('코스닥150') || p.name.includes('KODEX 200') || p.name.includes('코덱스 200'))
+            .map((p) => p.id)
+          newSelected[cls.class_code] = ids.length > 0 ? ids : cls.products.length > 0 ? [cls.products[0].id] : []
+        } else if (cls.class_code === 'OVS_EQ') {
+          const ids = cls.products
+            .filter((p) => p.name.includes('나스닥100') || p.name.includes('테크TOP10') || p.name.includes('Tech TOP10') || p.name.includes('미국테크'))
+            .map((p) => p.id)
+          newSelected[cls.class_code] = ids.length > 0 ? ids : cls.products.length > 0 ? [cls.products[0].id] : []
+        } else {
+          newSelected[cls.class_code] = cls.products.length > 0 ? [cls.products[0].id] : []
+        }
+      } else {
+        newSelected[cls.class_code] = cls.products.length > 0 ? [cls.products[0].id] : []
+      }
     })
     setSelected(newSelected)
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
         <Card className="glass border-0 bg-gradient-to-br from-primary/15 to-accent/5 animate-slide-up">
-          <CardContent className="p-6 h-full flex flex-col justify-center">
-            <p className="text-sm text-muted-foreground mb-2">예상 연 수익률</p>
+          <CardContent className="p-4 h-full flex flex-col justify-center">
+            <p className="text-[15.5px] text-muted-foreground mb-2">예상 연 수익률</p>
             <div className="flex items-end gap-3 flex-wrap">
               <p className="text-5xl font-bold gradient-text leading-none">{expReturn}</p>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">선택 상품 연 수익률 가중 기준</p>
+            <p className="text-[13.5px] text-muted-foreground mt-3">선택 상품 연 수익률 가중 기준</p>
           </CardContent>
         </Card>
 
-        <Card className="glass border-0 lg:col-span-2 animate-slide-up">
-          <CardHeader className="pb-2">
+        <Card className="glass border-0 lg:col-span-3 animate-slide-up">
+          <CardHeader className="pb-1 px-4 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-[17.5px] flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
                   <PieIcon className="w-4 h-4 text-white" />
                 </div>
@@ -767,7 +798,7 @@ function SimPane() {
               <div className="relative flex items-center gap-2">
                 <button
                   onClick={() => { setSaveOpen((v) => !v); setLoadOpen(false) }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-primary to-accent text-white font-medium shadow-md hover:opacity-90 transition-all duration-300 hover:scale-105 active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13.5px] rounded-lg bg-gradient-to-r from-primary to-accent text-white font-medium shadow-md hover:opacity-90 transition-all duration-300 hover:scale-105 active:scale-95"
                 >
                   <Save className="w-3.5 h-3.5" />
                   저장
@@ -775,7 +806,7 @@ function SimPane() {
                 <div className="relative" ref={loadRef}>
                   <button
                     onClick={() => { setLoadOpen((v) => !v); setSaveOpen(false) }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-white/50 bg-white/40 text-muted-foreground hover:bg-white/70 hover:text-foreground transition-all duration-300 hover:scale-105 active:scale-95"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[13.5px] rounded-lg border border-white/50 bg-white/40 text-muted-foreground hover:bg-white/70 hover:text-foreground transition-all duration-300 hover:scale-105 active:scale-95"
                   >
                     <FolderOpen className="w-3.5 h-3.5" />
                     불러오기
@@ -787,41 +818,50 @@ function SimPane() {
                   </button>
                   {saveOpen && (
                     <div className="absolute top-full right-0 mt-1 z-30 w-72 p-3 rounded-xl border border-white/60 bg-white/95 backdrop-blur shadow-lg animate-slide-up">
-                      <p className="text-xs font-medium text-foreground mb-2">현재 구성을 저장합니다</p>
-                      <input
-                        type="text"
-                        autoFocus
-                        value={nameDraft}
-                        placeholder="포트폴리오 이름"
-                        onChange={(e) => setNameDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSave()
-                          if (e.key === 'Escape') setSaveOpen(false)
-                        }}
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-white/60 bg-white/70 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/40 mb-2"
-                      />
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleSave}
-                          disabled={saving}
-                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all disabled:opacity-60"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          {saving ? '저장 중...' : '저장'}
-                        </button>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-medium text-foreground">현재 구성을 저장합니다</p>
                         <button
                           onClick={() => setSaveOpen(false)}
-                          className="p-2 rounded-lg border border-white/60 bg-white/50 text-muted-foreground hover:text-foreground transition-all shrink-0"
+                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/70 transition-all shrink-0"
                           aria-label="저장 취소"
                         >
                           <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={nameDraft}
+                          placeholder="포트폴리오 이름 입력"
+                          onChange={(e) => setNameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSave()
+                            if (e.key === 'Escape') setSaveOpen(false)
+                          }}
+                          className="flex-1 px-3 py-2 text-sm rounded-lg border border-white/60 bg-white/70 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <button
+                          onClick={handleSave}
+                          disabled={saving}
+                          className="flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all disabled:opacity-60 shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          {saving ? '저장 중...' : '저장'}
                         </button>
                       </div>
                     </div>
                   )}
                   {loadOpen && (
                     <div className="absolute top-full right-0 mt-1 z-30 w-72 p-3 rounded-xl border border-white/60 bg-white/95 backdrop-blur shadow-lg animate-slide-up">
-                      <p className="text-xs font-medium text-foreground mb-2">저장된 포트폴리오 ({saved.length})</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-xs font-medium text-foreground">저장된 포트폴리오</p>
+                        {saved.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold leading-none">
+                            {saved.length}
+                          </span>
+                        )}
+                      </div>
                       {saved.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-4 text-center">저장된 포트폴리오가 없습니다.</p>
                       ) : (
@@ -863,30 +903,75 @@ function SimPane() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-[170px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={42} outerRadius={66} paddingAngle={2} stroke="none">
-                    {pieData.map((d, i) => (
-                      <Cell key={i} fill={d.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
-                  <Legend
-                    layout="vertical"
-                    align="right"
-                    verticalAlign="middle"
-                    iconType="circle"
-                    iconSize={8}
-                    formatter={(value: string, _e, i) => {
-                      const item = pieData[i as number]
-                      const short = value.length > 13 ? value.slice(0, 13) + '…' : value
-                      return <span style={{ fontSize: 10, color: '#64748b' }}>{`${short} ${item?.value}%`}</span>
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+          <CardContent className="px-4 pt-1 pb-3">
+            <div className="grid grid-cols-4 items-center gap-3">
+              {/* col 1: 파이차트 */}
+              <div className="h-[150px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={60} paddingAngle={2} stroke="none">
+                      {pieData.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              {/* col 2: 범례 */}
+              <div className="space-y-1.5">
+                {pieData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-2 text-[15px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+                    <span className="truncate">{d.name} {d.value}%</span>
+                  </div>
+                ))}
+              </div>
+              {/* col 3-4: 경고/적정 카드 2개 */}
+              <div className="col-span-2 space-y-2">
+                {riskSum > 70 ? (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-red-50 to-rose-50/40 border border-red-200/60">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-red-600">위험자산 비중 한도 초과</p>
+                      <p className="text-[13px] text-red-500/80 mt-0.5">법정 한도 70% / 현재 <span className="font-semibold text-red-600">{riskSum}%</span></p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/40 border border-emerald-200/60">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-emerald-700">위험자산 비중 한도 적정</p>
+                      <p className="text-[13px] text-emerald-600/80 mt-0.5">법정 한도 70% / 현재 <span className="font-semibold">{riskSum}%</span></p>
+                    </div>
+                  </div>
+                )}
+                {concMsgs.length > 0 ? (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-200/60">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-amber-700">분산투자 권장</p>
+                      <p className="text-[13px] text-amber-600/80 mt-0.5">{concMsgs.join(' · ')} · 2개 이상 상품 선택을 권장합니다</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/40 border border-emerald-200/60">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-emerald-700">분산투자 적정</p>
+                      <p className="text-[13px] text-emerald-600/80 mt-0.5">다양한 자산에 투자되어 균형 있는 포트폴리오를 유지하고 있습니다</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -894,20 +979,27 @@ function SimPane() {
 
       {/* 포트폴리오 구성 */}
       <Card className="glass border-0 animate-slide-up">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-md">
-                <SlidersHorizontal className="w-4 h-4 text-white" />
-              </div>
-              포트폴리오 구성
-            </CardTitle>
+            <div className="flex items-center gap-3 min-w-0">
+              <CardTitle className="text-lg flex items-center gap-2 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-md">
+                  <SlidersHorizontal className="w-4 h-4 text-white" />
+                </div>
+                포트폴리오 구성
+              </CardTitle>
+              <p className="text-[13.5px] text-muted-foreground truncate">자산군 비중을 조절하고 편입 상품을 선택하세요 · 고위험 자산군은 복수 분산 가능</p>
+            </div>
             <div className="flex gap-2">
               {([['safe', '안정형'], ['balanced', '균형형'], ['growth', '수익추구형']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => applyPreset(key)}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-white/50 bg-white/40 text-muted-foreground hover:bg-white/70 hover:text-foreground transition-all duration-300 hover:scale-105 active:scale-95"
+                  className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all duration-300 hover:scale-105 active:scale-95 ${
+                    activePreset === key
+                      ? 'border-primary bg-primary text-white shadow-sm'
+                      : 'border-primary/30 bg-white text-primary hover:bg-primary/5'
+                  }`}
                 >
                   {label}
                 </button>
@@ -915,60 +1007,77 @@ function SimPane() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground mb-4">자산군 비중을 조절하고 편입 상품을 선택하세요 · 고위험 자산군은 복수 상품 분산이 가능합니다</p>
-
-          {(riskSum > 70 || concMsgs.length > 0) && (
-            <div className="space-y-2 mb-4">
-              {riskSum > 70 && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-red-50 to-rose-50/40 border border-red-200/60 shadow-sm animate-slide-up">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-500 to-rose-400 flex items-center justify-center shadow-md shrink-0">
-                    <AlertTriangle className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-red-600">위험자산 비중 한도 초과</p>
-                    <p className="text-xs text-red-500/80 mt-0.5">
-                      법정 한도 <span className="font-medium">70%</span> · 현재 <span className="font-semibold text-red-600">{riskSum}%</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-              {concMsgs.length > 0 && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-200/60 shadow-sm animate-slide-up">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-md shrink-0">
-                    <AlertTriangle className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-amber-700">분산투자 권장</p>
-                    <p className="text-xs text-amber-600/80 mt-0.5">
-                      {concMsgs.join(' · ')} · 2개 이상 상품 선택을 권장합니다
-                    </p>
-                  </div>
-                </div>
-              )}
+        <CardContent className="pt-3">
+          <div className={`flex items-center gap-4 mb-3 px-4 py-3 rounded-xl border transition-colors ${
+            total === 100 ? 'bg-emerald-50/60 border-emerald-200/60' : 'bg-red-50/40 border-red-200/40'
+          }`}>
+            {/* 합계 블록 */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[13.5px] text-muted-foreground">합계</span>
+              <span className={`tabular-nums inline-block min-w-[3.5ch] text-right text-[15.5px] font-bold ${
+                total === 100 ? 'text-emerald-600' : 'text-destructive'
+              }`}>
+                {total}%
+              </span>
             </div>
-          )}
-
-          <div className="space-y-3">
+            {/* 구분선 */}
+            <span className="w-px h-5 bg-border/40 shrink-0" />
+            {/* 위험자산 블록 */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[13.5px] text-muted-foreground">위험자산</span>
+              <span className={`tabular-nums inline-block min-w-[3ch] text-right text-[15.5px] font-bold ${
+                riskSum > 70 ? 'text-destructive' : 'text-foreground'
+              }`}>
+                {riskSum}%
+              </span>
+              <span className="text-[13.5px] text-muted-foreground">/ 한도 70%</span>
+              <div className="w-16 h-1.5 rounded-full bg-black/10 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${riskSum > 70 ? 'bg-red-400' : 'bg-emerald-400'}`}
+                  style={{ width: `${Math.min((riskSum / 70) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+            {/* 버튼 */}
+            <button
+              onClick={normalize}
+              className={`ml-auto shrink-0 px-3 py-1 text-[13.5px] rounded-lg font-medium hover:opacity-90 transition-all ${
+                total === 100
+                  ? 'bg-transparent text-emerald-600 border border-emerald-300 opacity-30'
+                  : 'bg-destructive/70 text-white/100'
+              }`}
+            >
+              100%로 자동 조정
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {classes.map((cls) => {
               const w = weights[cls.class_code] || 0
               const sel = selected[cls.class_code] || []
               const selProds = cls.products.filter((p) => sel.includes(p.id))
               const cRet = classReturnByCode(cls.class_code)
-              const isOpen = open[cls.class_code]
-              const selNames = selProds.length ? selProds.map((p) => p.name).join(', ') : '상품 미선택'
-              const splitTxt = cls.allow_multi && selProds.length > 1 ? ` · ${selProds.length}개 분산 (각 ${(w / selProds.length).toFixed(1)}%)` : ''
               return (
-                <div key={cls.class_code} className="rounded-xl border border-white/50 bg-white/40 p-3">
-                  <div className="grid grid-cols-[minmax(110px,140px)_1fr_auto] items-start gap-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground pt-1">
-                      <span className="w-2.5 h-2.5 rounded shrink-0" style={{ background: cls.color }} />
-                      {cls.class_name}
-                      {cls.is_risk && (
-                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-red-100 text-red-500">위험</span>
-                      )}
-                    </div>
-                    <div className="relative w-full pb-3.5">
+                <div
+                  key={cls.class_code}
+                  className="rounded-2xl border bg-white/40 overflow-hidden"
+                  style={{ borderColor: `${cls.color}70` }}
+                >
+                  {/* 헤더 */}
+                  <div
+                    className="flex items-center gap-2 px-3 py-2.5"
+                    style={{ background: `${cls.color}1a` }}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cls.color }} />
+                    <span className="text-[13.5px] font-semibold text-foreground truncate">{cls.class_name}</span>
+                    {cls.is_risk && (
+                      <span className="text-[10.5px] font-medium px-1.5 py-0.5 rounded-md bg-red-100 text-red-500 shrink-0">위험</span>
+                    )}
+                    <span className="ml-auto text-[15.5px] font-bold text-foreground shrink-0">{w}%</span>
+                  </div>
+
+                  {/* 슬라이더 */}
+                  <div className="px-3 pt-3 pb-1">
+                    <div className="relative pb-4">
                       <input
                         type="range"
                         min={0}
@@ -977,65 +1086,71 @@ function SimPane() {
                         value={w}
                         onChange={(e) => updateWeight(cls.class_code, parseInt(e.target.value))}
                         aria-label={`${cls.class_name} 비중`}
-                        className="cd-slider"
+                        className="cd-slider w-full"
                         style={{ '--val': `${w}%`, '--color': cls.color } as CSSProperties}
                       />
                       <div className="absolute bottom-0 left-0.5 right-0.5 flex justify-between">
                         {[0, 25, 50, 75, 100].map((t) => (
-                          <span key={t} className="text-[9px] text-muted-foreground">{t}</span>
+                          <span key={t} className="text-[10.5px] text-muted-foreground">{t}</span>
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 justify-end pt-1">
-                      <span className="text-sm font-semibold text-foreground w-9 text-right">{w}%</span>
-                      <span className="text-xs text-muted-foreground w-16 text-right">{cRet !== null ? `적용 ${cRet.toFixed(1)}%` : '—'}</span>
-                    </div>
+                    {cRet !== null && (
+                      <p className="text-[11.5px] text-muted-foreground mb-1">적용 수익률 <span className="font-semibold text-emerald-600">+{cRet.toFixed(1)}%</span></p>
+                    )}
                   </div>
 
-                  <div className="mt-3 pt-3 border-t border-white/50">
+                  {/* 상품 목록 */}
+                  <div className="p-2.5 space-y-1.5">
                     {w === 0 ? (
-                      <p className="text-xs text-muted-foreground">{cls.class_name} 상품의 비중이 0입니다.</p>
+                      <p className="text-[13.5px] text-muted-foreground text-center py-3">비중 0%</p>
                     ) : (
                       <>
-                        <button onClick={() => toggleOpen(cls.class_code)} className="w-full flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="text-left">{selNames}{splitTxt}</span>
-                          <span className="flex items-center gap-1 text-primary font-medium shrink-0 ml-2">
-                            {isOpen ? '접기' : '상품 변경'}
-                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                          </span>
-                        </button>
-                        {isOpen && (
-                          <div className="mt-2 space-y-0.5">
-                            {cls.products.map((p) => {
-                              const checked = sel.includes(p.id)
-                              return (
-                                <label key={p.id} className="flex items-center gap-2.5 py-1.5 text-xs border-b border-white/40 last:border-0 cursor-pointer">
-                                  <input
-                                    type={cls.allow_multi ? 'checkbox' : 'radio'}
-                                    name={`sel-${cls.class_code}`}
-                                    checked={checked}
-                                    onChange={() => toggleProd(cls.class_code, p.id, cls.allow_multi)}
-                                    className="w-3.5 h-3.5 accent-primary cursor-pointer shrink-0"
-                                  />
-                                  <span className="flex-1 text-foreground">{p.name}</span>
-                                  {p.tag && (
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                      p.tag === '수익률 1위' ? 'bg-primary/15 text-primary' : 'bg-white/60 text-muted-foreground'
-                                    }`}>
-                                      {p.tag}
-                                    </span>
-                                  )}
-                                  <span className="w-12 text-right font-semibold text-emerald-600">+{p.return_rate.toFixed(1)}%</span>
-                                </label>
-                              )
-                            })}
-                            {cls.allow_multi && (
-                              <p className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1.5">
-                                <Info className="w-3 h-3" />
-                                복수 선택 시 자산군 비중을 균등 분산합니다
-                              </p>
-                            )}
-                          </div>
+                        {cls.products.map((p) => {
+                          const checked = sel.includes(p.id)
+                          return (
+                            <label
+                              key={p.id}
+                              className={`flex flex-col gap-1 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                                checked
+                                  ? 'border-primary/40 bg-primary/5'
+                                  : 'border-border bg-white/70 hover:bg-white/90'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <input
+                                  type={cls.allow_multi ? 'checkbox' : 'radio'}
+                                  name={`sel-${cls.class_code}`}
+                                  checked={checked}
+                                  onChange={() => toggleProd(cls.class_code, p.id, cls.allow_multi)}
+                                  className="w-3.5 h-3.5 accent-primary cursor-pointer shrink-0 mt-0.5"
+                                />
+                                <span className="text-[13.5px] text-foreground leading-snug">{p.name}</span>
+                              </div>
+                              <div className="flex items-center justify-between pl-5">
+                                <span className="text-[13.5px] font-semibold text-emerald-600">+{p.return_rate.toFixed(1)}%</span>
+                                {p.tag && (
+                                  <span className={`text-[11.5px] px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                    p.tag === '수익률 1위' ? 'bg-primary/15 text-primary' : 'bg-white/60 text-muted-foreground'
+                                  }`}>
+                                    {p.tag}
+                                  </span>
+                                )}
+                              </div>
+                            </label>
+                          )
+                        })}
+                        {cls.allow_multi && selProds.length > 1 && (
+                          <p className="flex items-center gap-1 text-[11.5px] text-primary pt-0.5">
+                            <Info className="w-3 h-3" />
+                            {selProds.length}개 분산 · 각 {(w / selProds.length).toFixed(1)}%
+                          </p>
+                        )}
+                        {cls.allow_multi && selProds.length <= 1 && (
+                          <p className="flex items-center gap-1 text-[11.5px] text-muted-foreground pt-0.5">
+                            <Info className="w-3 h-3" />
+                            복수 선택 시 균등 분산
+                          </p>
                         )}
                       </>
                     )}
@@ -1045,15 +1160,6 @@ function SimPane() {
             })}
           </div>
 
-          <div className="flex items-center justify-between mt-4 p-3 rounded-xl bg-white/50 border border-white/50 text-sm">
-            <span className="text-muted-foreground">
-              합계 <span className={total === 100 ? 'text-emerald-600 font-semibold' : 'text-destructive font-semibold'}>{total}%</span>
-              {' · '}위험자산 <span className="font-medium text-foreground">{riskSum}%</span> / 한도 70%
-            </span>
-            <button onClick={normalize} className="text-xs text-primary font-medium hover:underline">
-              100%로 자동 조정
-            </button>
-          </div>
         </CardContent>
       </Card>
 

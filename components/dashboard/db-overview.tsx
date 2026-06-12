@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Users,
@@ -9,6 +10,7 @@ import {
   AlertTriangle,
   CalendarClock,
   PieChart as PieChartIcon,
+  ChevronRight,
 } from 'lucide-react'
 import { getDbDashboard, DbDashboard, getDbPortfolio, DbPortfolio, getCompanyProfile, CompanyProfile } from '@/lib/api'
 import { STATUS_CONFIG } from '@/lib/statusConfig'
@@ -59,6 +61,7 @@ function toDday(dateStr: string | null): string | null {
 
 
 export function DBOverview() {
+  const router = useRouter()
   const [data, setData] = useState<DbDashboard | null>(null)
   const [portfolio, setPortfolio] = useState<DbPortfolio | null>(null)
   const [company, setCompany] = useState<CompanyProfile | null>(null)
@@ -278,6 +281,15 @@ export function DBOverview() {
                   <span className="text-muted-foreground w-16 text-right">{toEok(item.amount)}억</span>
                 </div>
               ))}
+            </div>
+            <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/50">
+              <button
+                onClick={() => router.push('/pension/db/assets')}
+                className="flex items-center gap-1 text-sm text-primary font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:gap-2 hover:shadow-sm transition-all"
+              >
+                목록 전체 보기
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </CardContent>
         </Card>
