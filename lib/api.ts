@@ -306,8 +306,8 @@ export type ScheduleDcItem = {
   title: string
   due_date: string
   status: string
+  is_mandatory: boolean
   d_day: string
-  required: boolean
 }
 
 export type ScheduleDcResponse = {
@@ -333,9 +333,9 @@ export type ScheduleDcDetail = {
   d_day: string
   company_name: string | null
   brn: string | null
+  is_mandatory: boolean
   plan_type: string | null
   target_employees: ScheduleDcTargetEmployee[]
-  required: boolean
 }
 
 export async function getSchedulesDc(
@@ -435,8 +435,8 @@ export type ScheduleDbItem = {
   title: string
   due_date: string
   status: string
+  is_mandatory: boolean
   d_day: string
-  required: boolean
 }
 
 export type ScheduleDbResponse = {
@@ -459,12 +459,12 @@ export type ScheduleDbDetail = {
   created_date: string | null
   description: string | null
   status: string
+  is_mandatory: boolean
   d_day: string
   company_name: string | null
   brn: string | null
   plan_type: string | null
   target_employees: ScheduleDbTargetEmployee[]
-  required: boolean
 }
 
 export async function getSchedulesDb(

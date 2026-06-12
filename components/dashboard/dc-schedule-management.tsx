@@ -41,10 +41,9 @@ function convertDetailToSchedule(detail: ScheduleDcDetail): Schedule {
     content: detail.description || '',
     type: 'DC',
     targetType: hasEmployees ? '가입자' : ('기업' as TargetType),
-    priority: 'medium',
     status: detail.status === 'DONE' ? '완료' : detail.status === 'OVERDUE' ? '지연' : '예정',
     createdAt: detail.created_date || '',
-    required: detail.required,
+    isMandatory: detail.is_mandatory,
     relatedSubscribers: hasEmployees
       ? detail.target_employees.map(e => ({
           id: String(e.employee_id),
@@ -554,13 +553,13 @@ function AddModalContent({
    캘린더 뷰
 ───────────────────────────────────────────── */
 function CalendarView({
-  schedules,
+  refreshKey,
   onAdd,
   onDelete,
   onViewDetail,
   onComplete,
 }: {
-  schedules: Schedule[]
+  refreshKey: number
   onAdd: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
   onDelete: (id: string) => void
   onViewDetail: (s: Schedule) => void
@@ -572,6 +571,31 @@ function CalendarView({
   const [month, setMonth] = useState(today.getMonth() + 1)
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [showAddForDate, setShowAddForDate] = useState<string | null>(null)
+  const [calendarSchedules, setCalendarSchedules] = useState<Schedule[]>([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    getSchedulesDc({period: 0}, controller.signal)
+      .then(res => {
+      const items: Schedule[] = res.schedules.map(item => ({
+        id: String(item.id),
+        title: item.title,
+        dueDate: item.due_date,
+        content: '',
+        type: 'DC' as const,
+        targetType: '기업',
+        status: item.status === 'DONE' ? '완료' : item.status === 'OVERDUE' ? '지연' : '예정',
+        isMandatory: item.is_mandatory,
+        createdAt: '',
+      }))
+
+      setCalendarSchedules(items)
+    })
+    .catch(() => {})
+    return () => controller.abort()
+  }, [refreshKey])
+
 
   const daysInMonth = new Date(year, month, 0).getDate()
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
@@ -593,7 +617,7 @@ function CalendarView({
 
   const getDateSchedules = (day: number) => {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return schedules.filter(s => s.dueDate === dateStr)
+    return calendarSchedules.filter(s => s.dueDate === dateStr)
   }
 
   const getScheduleColor = (s: Schedule) => {
@@ -603,7 +627,7 @@ function CalendarView({
     return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' }
   }
 
-  const selectedDateSchedules = schedules.filter(s => s.dueDate === selectedDate)
+  const selectedDateSchedules = calendarSchedules.filter(s => s.dueDate === selectedDate)
 
   const DAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -723,7 +747,7 @@ function CalendarView({
                 <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
                   <Calendar className="w-6 h-6 text-slate-300" />
                 </div>
-                <p className="text-xs text-slate-400">이 날짜에 일정이 없습니다.</p>
+                <p className="text-xs text-slate-400">선택한 날짜에 일정이 없습니다.</p>
                 <button
                   onClick={() => setShowAddForDate(selectedDate)}
                   className="mt-2 text-xs text-blue-600 font-medium hover:underline"
@@ -801,6 +825,7 @@ export function ScheduleManagement() {
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [subscriberDetail, setSubscriberDetail] = useState<SubscriberDetail | null>(null)
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -813,10 +838,9 @@ export function ScheduleManagement() {
           content: '',
           type: 'DC' as const,
           targetType: '기업' as TargetType,
-          priority: 'medium' as const,
           status: item.status === 'DONE' ? ('완료' as const) : item.status === 'OVERDUE' ? ('지연' as const) : ('예정' as const),
           createdAt: '',
-          required: item.required,
+          isMandatory: item.is_mandatory,
         }))
         setSchedules(items)
       })
@@ -856,26 +880,44 @@ export function ScheduleManagement() {
   }
 
   const handleAdd = async (title: string, dueDate: string, description: string, employeeIds: number[]) => {
-    const detail = await createScheduleDc({
+    await createScheduleDc({
       title,
       due_date: dueDate,
       description: description || undefined,
       employee_ids: employeeIds.length > 0 ? employeeIds : undefined,
-    })
-    const schedule = convertDetailToSchedule(detail)
-    setSchedules(prev => [schedule, ...prev])
-    setToast({ message: '새 일정이 추가되었습니다.', type: 'success' })
+    });
+    const res = await getSchedulesDc({});
+    const items = res.schedules.map((item) => ({
+      id: String(item.id),
+      title: item.title,
+      dueDate: item.due_date,
+      content: '',
+      type: 'DC' as const,
+      targetType: '기업' as TargetType,
+      status:
+        item.status === 'DONE'
+          ? ('완료' as const)
+          : item.status === 'OVERDUE'
+            ? ('지연' as const)
+            : ('예정' as const),
+      isMandatory: item.is_mandatory,
+      createdAt: '',
+    }));
+    setSchedules(items);
+    setCalendarRefreshKey((prev) => prev + 1);
+    setToast({ message: '새 일정이 추가되었습니다.', type: 'success' });
   }
 
   const handleDelete = async (id: string) => {
     const schedule = schedules.find(s => s.id === id)
-    if (schedule?.required) {
-      setToast({ message: '필수 일정이므로 삭제 불가능합니다.', type: 'error' })
+    if (schedule?.isMandatory) {
+      setToast({ message: '의무이행 일정은 삭제 불가합니다.', type: 'error' })
       return
     }
     try {
       await deleteScheduleDc(Number(id))
       setSchedules(prev => prev.filter(s => s.id !== id))
+      setCalendarRefreshKey(prev => prev + 1)
       setToast({ message: '삭제되었습니다.', type: 'success' })
     } catch {
       setToast({ message: '일정 삭제에 실패했습니다.', type: 'error' })
@@ -886,6 +928,7 @@ export function ScheduleManagement() {
     try {
       await completeScheduleDc(Number(id))
       setSchedules(prev => prev.map(s => s.id === id ? { ...s, status: '완료' as const } : s))
+      setCalendarRefreshKey(prev => prev + 1)
       setToast({ message: '처리 완료되었습니다.', type: 'success' })
     } catch {
       setToast({ message: '완료 처리에 실패했습니다.', type: 'error' })
@@ -1219,7 +1262,7 @@ export function ScheduleManagement() {
       {viewMode === 'calendar' && (
         <div className="glass rounded-2xl border border-border/50 p-6">
           <CalendarView
-            schedules={schedules}
+            refreshKey={calendarRefreshKey}
             onAdd={handleAdd}
             onDelete={handleDelete}
             onViewDetail={handleViewDetail}
