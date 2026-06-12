@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Users,
@@ -9,15 +10,18 @@ import {
   AlertTriangle,
   CalendarClock,
   PieChart as PieChartIcon,
+  ChevronRight,
 } from 'lucide-react'
 import { getDbDashboard, DbDashboard, getDbPortfolio, DbPortfolio, getCompanyProfile, CompanyProfile } from '@/lib/api'
 import { STATUS_CONFIG } from '@/lib/statusConfig'
 import { WelcomeBanner } from './welcome-banner'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  '정기예금': '#2563eb',
-  '이율보증형보험': '#15803d',
-  'ELB 및 ELD': '#d97706',
+  '원리금보장형': '#2563eb',
+  '채권형': '#64748b',
+  '혼합형·TDF': '#6366f1',
+  '국내주식ETF': '#0ea5e9',
+  '해외주식ETF': '#06b6d4',
 }
 
 const ddayToneClass: Record<'danger' | 'warning' | 'info', string> = {
@@ -57,14 +61,19 @@ function toDday(dateStr: string | null): string | null {
 
 
 export function DBOverview() {
+  const router = useRouter()
   const [data, setData] = useState<DbDashboard | null>(null)
   const [portfolio, setPortfolio] = useState<DbPortfolio | null>(null)
   const [company, setCompany] = useState<CompanyProfile | null>(null)
+  const [barVisible, setBarVisible] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
     getDbDashboard(controller.signal).then(setData).catch(() => {})
-    getDbPortfolio(controller.signal).then(setPortfolio).catch(() => {})
+    getDbPortfolio(controller.signal).then((p) => {
+      setPortfolio(p)
+      setTimeout(() => setBarVisible(true), 80)
+    }).catch(() => {})
     getCompanyProfile(controller.signal).then(setCompany).catch(() => {})
     return () => controller.abort()
   }, [])
@@ -106,7 +115,7 @@ export function DBOverview() {
                 <Wallet className="w-6 h-6 text-white" />
               </div>
               <div className="mt-4">
-                <p className="text-sm text-muted-foreground">현재 적립금</p>
+                <p className="text-sm text-muted-foreground">총 적립금</p>
                 <p className="text-3xl font-bold text-foreground mt-1">
                   {data != null ? toEok(data.funded_amount) : '-'}
                   <span className="text-lg font-normal text-muted-foreground ml-1">억</span>
@@ -235,14 +244,32 @@ export function DBOverview() {
           </CardHeader>
           <CardContent>
             {/* Stacked bar */}
-            <div className="flex h-3 rounded-full overflow-hidden mb-5">
-              {(portfolio?.portfolio_items ?? []).map((item) => (
-                <div
-                  key={item.category}
-                  style={{ flex: item.amount, backgroundColor: CATEGORY_COLORS[item.category] ?? '#94a3b8' }}
-                  className="h-full"
-                />
-              ))}
+            <div className="relative h-3 rounded-full overflow-hidden mb-5 bg-slate-100/60">
+              <div
+                className="absolute inset-0 flex"
+                style={{
+                  transform: barVisible ? 'scaleX(1)' : 'scaleX(0)',
+                  transformOrigin: 'left center',
+                  transition: 'transform 0.75s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                {(portfolio?.portfolio_items ?? []).map((item) => (
+                  <div
+                    key={item.category}
+                    style={{ flex: item.amount, backgroundColor: CATEGORY_COLORS[item.category] ?? '#94a3b8' }}
+                    className="h-full"
+                  />
+                ))}
+              </div>
+              {/* shimmer overlay */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)',
+                  backgroundSize: '200% 100%',
+                  animation: barVisible ? 'shimmer 2s ease-in-out infinite' : 'none',
+                }}
+              />
             </div>
 
             <div className="space-y-3">
@@ -254,6 +281,15 @@ export function DBOverview() {
                   <span className="text-muted-foreground w-16 text-right">{toEok(item.amount)}억</span>
                 </div>
               ))}
+            </div>
+            <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/50">
+              <button
+                onClick={() => router.push('/pension/db/assets')}
+                className="flex items-center gap-1 text-sm text-primary font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:gap-2 hover:shadow-sm transition-all"
+              >
+                목록 전체 보기
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </CardContent>
         </Card>

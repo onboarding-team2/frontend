@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight } from 'lucide-react'
+import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight, Wallet, HelpCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { TabType } from '@/lib/types'
 import { useEffect, useState } from 'react'
@@ -8,22 +8,33 @@ import { useEffect, useState } from 'react'
 interface SidebarProps {
   activeTab: TabType
   setActiveTab: (tab: TabType) => void
+  planType?: string
 }
 
 interface CompanyInfo {
   companyName: string
   businessNumber: string
-  planType : string
+  planType: string
 }
 
-const menuItems = [
+const dcMenuItems = [
   { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
   { id: 'schedules' as TabType, label: '기일 관리', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
+  { id: 'faq' as TabType, label: 'FAQ', icon: HelpCircle },
 ]
 
-export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+const dbMenuItems = [
+  { id: 'overview' as TabType, label: '현황 관리', icon: LayoutDashboard },
+  { id: 'assets' as TabType, label: '자산 운용', icon: Wallet },
+  { id: 'members' as TabType, label: '가입자 관리', icon: Users },
+  { id: 'schedules' as TabType, label: '기일 도래', icon: CalendarDays },
+  { id: 'documents' as TabType, label: '양서식', icon: FileText },
+  { id: 'faq' as TabType, label: 'FAQ', icon: HelpCircle },
+]
+
+export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {
   const router = useRouter()
 
   // 기업 정보
@@ -67,6 +78,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     localStorage.removeItem('planType')
     
     deleteCookie('token')
+    deleteCookie('planType')
 
     router.push('/')
   }
@@ -83,7 +95,12 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         {loading ? (
           <div className="rounded-2xl p-5 animate-pulse bg-white/20 h-24" />
         ) : companyInfo ? (
-          <div className="relative rounded-2xl p-5 bg-gradient-to-br from-primary to-accent shadow-lg glow-blue overflow-hidden hover-lift">
+          <button
+            type="button"
+            onClick={() => router.push(`/pension/${companyInfo.planType.toLowerCase()}/company`)}
+            title="회사 상세 정보 보기"
+            className="w-full text-left relative rounded-2xl p-5 bg-gradient-to-br from-primary to-accent shadow-lg glow-blue overflow-hidden hover-lift cursor-pointer transition-transform active:scale-[0.98]"
+          >
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
             <div className="absolute -bottom-10 -left-6 w-28 h-28 bg-white/10 rounded-full blur-2xl" />
             <div className="relative flex items-center gap-3">
@@ -114,7 +131,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <p className="text-xs text-white/85 font-medium">{companyInfo.businessNumber}</p>
               </div>
             </div>
-          </div>
+          </button>
         ) : (
           <div className="glass rounded-2xl p-4 text-center text-xs text-muted-foreground">
             기업 정보 없음
@@ -126,17 +143,17 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       <nav className="flex-1 px-4 py-2">
         <p className="text-xs font-medium text-muted-foreground px-3 mb-3">메뉴</p>
         <ul className="space-y-1">
-          {menuItems.map((item) => {
+          {(planType === 'DB' ? dbMenuItems : dcMenuItems).map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
             return (
               <li key={item.id}>
                 <button
                   onClick={() => setActiveTab(item.id)}
-                  className={`menu-item w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all text-left group ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 text-left group ${
                     isActive
-                      ? 'active bg-gradient-to-r from-primary/15 to-accent/10 text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-white/50 hover:text-foreground'
+                      ? 'bg-gradient-to-r from-primary/15 to-accent/10 text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-primary/10 hover:text-primary active:scale-[0.99]'
                   }`}
                 >
                   <div className="flex items-center gap-3">

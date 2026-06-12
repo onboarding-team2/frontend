@@ -59,6 +59,45 @@ export type CompanyProfile = {
   planType: string
 }
 
+export type CompanyDetail = {
+  // 회사 기본 정보
+  companyName: string
+  businessNumber: string
+  representativeName: string | null
+  planType: 'DC' | 'DB'
+  // 퇴직연금 정보 (공통)
+  companyAccount: string | null
+  contractDate: string | null
+  employeeCount: number | null
+  totalReserve: number | null
+  // DC 전용
+  paymentCycle: string | null
+  // DB 전용
+  fiscalMonth: number | null
+  targetReturnRate: number | null
+}
+
+export type ContributionChartItem = {
+  label: string
+  amount: number
+  paid: boolean
+}
+
+export type DcContributionChart = {
+  cycle: 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+  items: ContributionChartItem[]
+}
+
+export async function getDcContributionChart(signal?: AbortSignal): Promise<DcContributionChart> {
+  const res = await fetch(`${API_BASE}/company/dc-contributions`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '부담금 납입 현황 조회 실패'))
+  return res.json()
+}
+
 export async function getCompanyProfile(signal?: AbortSignal): Promise<CompanyProfile> {
   const res = await fetch(`${API_BASE}/company/profile`, {
     headers: authHeaders(),
@@ -66,6 +105,16 @@ export async function getCompanyProfile(signal?: AbortSignal): Promise<CompanyPr
     signal,
   })
   if (!res.ok) throw new Error(await readError(res, '기업 정보 조회 실패'))
+  return res.json()
+}
+
+export async function getCompanyDetail(signal?: AbortSignal): Promise<CompanyDetail> {
+  const res = await fetch(`${API_BASE}/company/detail`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '기업 상세 정보 조회 실패'))
   return res.json()
 }
 
@@ -285,6 +334,7 @@ export type ScheduleDcItem = {
   title: string
   due_date: string
   status: string
+  is_mandatory: boolean
   d_day: string
 }
 
@@ -311,6 +361,7 @@ export type ScheduleDcDetail = {
   d_day: string
   company_name: string | null
   brn: string | null
+  is_mandatory: boolean
   plan_type: string | null
   target_employees: ScheduleDcTargetEmployee[]
 }
@@ -365,6 +416,21 @@ export async function deleteScheduleDc(id: number): Promise<void> {
   if (!res.ok) throw new Error(await readError(res, '일정 삭제 실패'))
 }
 
+export async function updateScheduleDc(id: number, data: {
+  title: string
+  due_date: string
+  description?: string
+  employee_ids?: number[]
+}): Promise<ScheduleDcDetail> {
+  const res = await fetch(`${API_BASE}/dc/schedules/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 수정 실패'))
+  return res.json()
+}
+
 export async function completeScheduleDc(id: number): Promise<ScheduleDcDetail> {
   const res = await fetch(`${API_BASE}/dc/schedules/${id}/complete`, {
     method: 'PATCH',
@@ -412,6 +478,7 @@ export type ScheduleDbItem = {
   title: string
   due_date: string
   status: string
+  is_mandatory: boolean
   d_day: string
 }
 
@@ -435,6 +502,7 @@ export type ScheduleDbDetail = {
   created_date: string | null
   description: string | null
   status: string
+  is_mandatory: boolean
   d_day: string
   company_name: string | null
   brn: string | null
@@ -490,6 +558,21 @@ export async function deleteScheduleDb(id: number): Promise<void> {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(await readError(res, '일정 삭제 실패'))
+}
+
+export async function updateScheduleDb(id: number, data: {
+  title: string
+  due_date: string
+  description?: string
+  employee_ids?: number[]
+}): Promise<ScheduleDbDetail> {
+  const res = await fetch(`${API_BASE}/db/schedules/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 수정 실패'))
+  return res.json()
 }
 
 export async function completeScheduleDb(id: number): Promise<ScheduleDbDetail> {
@@ -555,4 +638,160 @@ export async function getDbPortfolio(signal?: AbortSignal): Promise<DbPortfolio>
   })
   if (!res.ok) throw new Error(await readError(res, 'DB 포트폴리오 조회 실패'))
   return res.json()
+}
+
+// ─── DB Assets API ─────────────────────────────────────────────────────────
+
+export type ReturnHistoryPoint = {
+  base_date: string
+  return_rate: number
+}
+
+export type AssetClassPortfolio = {
+  class_code: string
+  class_name: string
+  amount: number
+  pct: number
+  color: string
+}
+
+export type ProductHolding = {
+  product_name: string
+  provider: string
+  return_rate: number
+  amount: number
+}
+
+export type AssetClassHoldings = {
+  class_code: string
+  class_name: string
+  color: string
+  products: ProductHolding[]
+}
+
+export type AssetsCurrent = {
+  current_return_rate: number
+  target_return_rate: number
+  return_history: ReturnHistoryPoint[]
+  portfolio_by_class: AssetClassPortfolio[]
+  holdings_by_class: AssetClassHoldings[]
+  total_amount: number
+  risk_asset_ratio: number
+}
+
+export async function getAssetsCurrent(signal?: AbortSignal): Promise<AssetsCurrent> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/current`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '자산 현황 조회 실패'))
+  return res.json()
+}
+
+export async function updateTargetReturnRate(rate: number): Promise<number> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/target-rate`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify({ target_return_rate: rate }),
+  })
+  if (!res.ok) throw new Error(await readError(res, '목표 수익률 업데이트 실패'))
+  return res.json()
+}
+
+export type ProductOption = {
+  id: number
+  name: string
+  return_rate: number
+  tag: string | null
+  provider: string
+}
+
+export type AssetClassOption = {
+  id: number
+  class_code: string
+  class_name: string
+  is_risk: boolean
+  allow_multi: boolean
+  avg_return_3y: number
+  color: string
+  products: ProductOption[]
+}
+
+export type SimulationOptions = {
+  classes: AssetClassOption[]
+}
+
+export async function getSimulationOptions(signal?: AbortSignal): Promise<SimulationOptions> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation-options`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 옵션 조회 실패'))
+  return res.json()
+}
+
+export type SimulationItemDto = {
+  asset_class_id: number
+  product_master_id: number | null
+  weight_pct: number
+  applied_return: number
+}
+
+export type SimulationSaveRequest = {
+  simulation_name: string
+  preset_type: string
+  expected_return_rate: number
+  risk_asset_ratio: number
+  items: SimulationItemDto[]
+}
+
+export type SimulationItemResponse = {
+  asset_class_id: number
+  class_code: string
+  class_name: string
+  product_master_id: number | null
+  product_name: string | null
+  weight_pct: number
+  applied_return: number
+}
+
+export type Simulation = {
+  id: number
+  simulation_name: string
+  expected_return_rate: number
+  risk_asset_ratio: number
+  preset_type: string
+  status: string
+  created_at: string
+  items: SimulationItemResponse[]
+}
+
+export async function saveSimulation(data: SimulationSaveRequest): Promise<Simulation> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 저장 실패'))
+  return res.json()
+}
+
+export async function listSimulations(signal?: AbortSignal): Promise<Simulation[]> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 목록 조회 실패'))
+  return res.json()
+}
+
+export async function deleteSimulation(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/pension/db/assets/simulation/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readError(res, '시뮬레이션 삭제 실패'))
 }
