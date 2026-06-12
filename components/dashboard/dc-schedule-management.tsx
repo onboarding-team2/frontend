@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Calendar, List, Plus, Search, CheckCircle2,
   XCircle, Clock, Building2, Users, Trash2, X,
-  FileText, User, ChevronLeft, ChevronRight, AlertTriangle
+  FileText, User, ChevronLeft, ChevronRight, AlertTriangle, Pencil
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,6 +20,7 @@ import {
   getSchedulesDc,
   getScheduleDcDetail,
   createScheduleDc,
+  updateScheduleDc,
   deleteScheduleDc,
   completeScheduleDc,
   getPensionMemberDetail,
@@ -126,10 +127,16 @@ function DetailModalContent({
   schedule,
   onClose,
   onSubscriberClick,
+  onEdit,
+  onComplete,
+  onDelete,
 }: {
   schedule: Schedule
   onClose: () => void
   onSubscriberClick: (sub: SubscriberDetail) => void
+  onEdit?: () => void
+  onComplete?: () => void
+  onDelete?: () => void
 }) {
   const getDays = () => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -279,7 +286,36 @@ function DetailModalContent({
         )}
       </div>
 
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex items-center justify-between">
+        <div className="flex gap-2">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-50 text-blue-600 text-sm font-semibold hover:bg-blue-100 transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              수정
+            </button>
+          )}
+          {onComplete && schedule.status !== '완료' && (
+            <button
+              onClick={onComplete}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-semibold hover:bg-emerald-100 transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              완료
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              삭제
+            </button>
+          )}
+        </div>
         <button
           onClick={onClose}
           className="px-6 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition-colors"
@@ -550,6 +586,240 @@ function AddModalContent({
 }
 
 /* ─────────────────────────────────────────────
+   일정 수정 모달 내용
+───────────────────────────────────────────── */
+function EditModalContent({
+  schedule,
+  onClose,
+  onEdit,
+}: {
+  schedule: Schedule
+  onClose: () => void
+  onEdit: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
+}) {
+  const [form, setForm] = useState({
+    title: schedule.title,
+    dueDate: schedule.dueDate,
+    content: schedule.content || '',
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [allMembers, setAllMembers] = useState<Employee[]>([])
+  const [subscriberSearch, setSubscriberSearch] = useState('')
+  const [selectedSubscribers, setSelectedSubscribers] = useState<Employee[]>([])
+  const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false)
+
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowSubscriberDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => { document.removeEventListener('mousedown', handleClickOutside) }
+  }, [])
+
+  useEffect(() => {
+    getDcMembers().then(members => {
+      setAllMembers(members)
+      if (schedule.relatedSubscribers && schedule.relatedSubscribers.length > 0) {
+        const preSelected = schedule.relatedSubscribers.map(s => {
+          const full = members.find(m => m.id === Number(s.id))
+          return full ?? { id: Number(s.id), name: s.name, rrnMasked: null, position: null, startDate: null, joinDate: null, hasIrpAccount: null, defaultOption: null, balance: null, contributionPaid: null, status: null } as Employee
+        })
+        setSelectedSubscribers(preSelected)
+      }
+    }).catch(() => {})
+  }, [])
+
+  const filteredMembers = allMembers
+    .filter(m => !selectedSubscribers.some(s => s.id === m.id))
+    .filter(m => m.name.includes(subscriberSearch) || getChoseong(m.name).includes(subscriberSearch))
+
+  const validate = () => {
+    const e: Record<string, string> = {}
+    if (!form.title.trim()) e.title = '일정 타이틀을 입력해주세요.'
+    if (!form.dueDate) e.dueDate = '기한을 선택해주세요.'
+    if (!form.content.trim()) e.content = '일정 내용을 입력해주세요.'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSubmit = async () => {
+    if (!validate() || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      await onEdit(form.title, form.dueDate, form.content, selectedSubscribers.map(m => m.id))
+      onClose()
+    } catch {
+      setErrors(prev => ({ ...prev, submit: '일정 수정에 실패했습니다. 다시 시도해주세요.' }))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const addSubscriber = (member: Employee) => {
+    setSelectedSubscribers(prev => [...prev, member])
+    setSubscriberSearch('')
+    setShowSubscriberDropdown(false)
+  }
+
+  const removeSubscriber = (id: number) => {
+    setSelectedSubscribers(prev => prev.filter(s => s.id !== id))
+  }
+
+  const f = (field: string, val: string) => setForm(p => ({ ...p, [field]: val }))
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center gap-4 mt-2 mb-6 pr-8">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
+          <Pencil className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">일정 수정</h2>
+          <p className="text-sm text-slate-500 mt-0.5">일정 정보를 수정합니다</p>
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/50 border border-slate-200/60 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-blue-600" />
+            </div>
+            <span className="text-sm font-bold text-slate-800">기본 정보</span>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-2 block">
+              일정 타이틀 <span className="text-red-500">*</span>
+            </label>
+            <input
+              className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.title ? 'border-red-400' : 'border-slate-200'}`}
+              value={form.title}
+              onChange={e => f('title', e.target.value)}
+            />
+            {errors.title && <p className="text-xs text-red-500 mt-1.5">{errors.title}</p>}
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-2 block">
+              기한 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.dueDate ? 'border-red-400' : 'border-slate-200'}`}
+              value={form.dueDate}
+              onChange={e => f('dueDate', e.target.value)}
+            />
+            {errors.dueDate && <p className="text-xs text-red-500 mt-1.5">{errors.dueDate}</p>}
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200/60 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-indigo-600" />
+            </div>
+            <span className="text-sm font-bold text-slate-800">일정 내용</span>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-2 block">
+              내용 <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className={`w-full px-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 resize-none bg-white/80 transition-all ${errors.content ? 'border-red-400' : 'border-slate-200'}`}
+              value={form.content}
+              onChange={e => f('content', e.target.value)}
+              rows={3}
+            />
+            {errors.content && <p className="text-xs text-red-500 mt-1.5">{errors.content}</p>}
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-cyan-50/30 border border-slate-200/60 p-5 space-y-4" ref={dropdownRef}>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+              <Users className="w-4 h-4 text-cyan-600" />
+            </div>
+            <span className="text-sm font-bold text-slate-800">연관 가입자</span>
+            <span className="text-xs text-slate-400 ml-1">(선택)</span>
+          </div>
+
+          <div className="relative">
+            <label className="text-xs font-semibold text-slate-600 mb-2 block">가입자 검색</label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white/80"
+                placeholder="이름으로 검색..."
+                value={subscriberSearch}
+                onChange={e => { setSubscriberSearch(e.target.value); setShowSubscriberDropdown(true) }}
+                onFocus={() => setShowSubscriberDropdown(true)}
+              />
+            </div>
+            {showSubscriberDropdown && filteredMembers.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-slate-200 shadow-xl z-50 max-h-60 overflow-y-auto">
+                {filteredMembers.map(member => (
+                  <button
+                    key={member.id}
+                    onClick={() => addSubscriber(member)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-b-0"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{member.name}</p>
+                      <p className="text-xs text-slate-500">{member.position || '직책 미지정'}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedSubscribers.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-600">선택된 가입자 ({selectedSubscribers.length}명)</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedSubscribers.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-cyan-200 text-sm">
+                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                      <User className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="font-medium text-slate-700">{sub.name}</span>
+                    <button onClick={() => removeSubscriber(sub.id)} className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {errors.submit && <p className="text-xs text-red-500 text-center">{errors.submit}</p>}
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onClose} disabled={isSubmitting} className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50">
+          취소
+        </button>
+        <button onClick={handleSubmit} disabled={isSubmitting} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-50">
+          <Pencil className="w-4 h-4" />
+          {isSubmitting ? '수정 중...' : '일정 수정'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
    캘린더 뷰
 ───────────────────────────────────────────── */
 function CalendarView({
@@ -558,12 +828,14 @@ function CalendarView({
   onDelete,
   onViewDetail,
   onComplete,
+  onEdit,
 }: {
   refreshKey: number
   onAdd: (title: string, dueDate: string, description: string, employeeIds: number[]) => Promise<void>
   onDelete: (id: string) => void
   onViewDetail: (s: Schedule) => void
   onComplete: (id: string) => void
+  onEdit: (s: Schedule) => void
 }) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -655,9 +927,9 @@ function CalendarView({
       </div>
 
       {/* 캘린더 + 사이드 패널 */}
-      <div className="flex gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {/* 캘린더 그리드 */}
-        <div className="flex-1 min-w-0 rounded-2xl border border-slate-200/60 overflow-hidden bg-white/60">
+        <div className="col-span-2 rounded-2xl border border-slate-200/60 overflow-hidden bg-white/60">
           <div className="grid grid-cols-7 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/60">
             {DAYS.map((d, i) => (
               <div key={d} className={`py-3 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>
@@ -726,7 +998,7 @@ function CalendarView({
         </div>
 
         {/* 우측 날짜별 일정 패널 */}
-        <div className="w-[320px] flex-shrink-0 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-4 flex flex-col">
+        <div className="col-span-1 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/30 border border-slate-200/60 p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-bold text-slate-800">
               {selectedDate} 기일 목록
@@ -776,6 +1048,15 @@ function CalendarView({
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                       {!isCompleted && (
                         <button
+                          onClick={() => onEdit(s)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
+                          title="수정"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {!isCompleted && (
+                        <button
                           onClick={() => onComplete(s.id)}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
                           title="완료 처리"
@@ -820,6 +1101,7 @@ export function ScheduleManagement() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
@@ -906,6 +1188,49 @@ export function ScheduleManagement() {
     setSchedules(items);
     setCalendarRefreshKey((prev) => prev + 1);
     setToast({ message: '새 일정이 추가되었습니다.', type: 'success' });
+  }
+
+  const handleEdit = async (schedule: Schedule) => {
+    if (schedule.isMandatory) {
+      setToast({ message: '기본 일정의 경우 의무이행 일정은 수정 불가합니다.', type: 'error' })
+      return
+    }
+    const id = Number(schedule.id)
+    if (!isNaN(id)) {
+      try {
+        const detail = await getScheduleDcDetail(id)
+        setEditingSchedule(convertDetailToSchedule(detail))
+      } catch {
+        setEditingSchedule(schedule)
+      }
+    } else {
+      setEditingSchedule(schedule)
+    }
+  }
+
+  const handleEditSubmit = async (title: string, dueDate: string, description: string, employeeIds: number[]) => {
+    if (!editingSchedule) return
+    await updateScheduleDc(Number(editingSchedule.id), {
+      title,
+      due_date: dueDate,
+      description: description || undefined,
+      employee_ids: employeeIds.length > 0 ? employeeIds : undefined,
+    })
+    const res = await getSchedulesDc({})
+    const items = res.schedules.map(item => ({
+      id: String(item.id),
+      title: item.title,
+      dueDate: item.due_date,
+      content: '',
+      type: 'DC' as const,
+      targetType: '기업' as TargetType,
+      status: item.status === 'DONE' ? ('완료' as const) : item.status === 'OVERDUE' ? ('지연' as const) : ('예정' as const),
+      isMandatory: item.is_mandatory,
+      createdAt: '',
+    }))
+    setSchedules(items)
+    setCalendarRefreshKey(prev => prev + 1)
+    setToast({ message: '일정이 수정되었습니다.', type: 'success' })
   }
 
   const handleDelete = async (id: string) => {
@@ -1048,6 +1373,13 @@ export function ScheduleManagement() {
             )}
 
             <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => handleEdit(schedule)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
+                title="수정"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
               {!isCompleted && (
                 <button
                   onClick={() => handleComplete(schedule.id)}
@@ -1267,6 +1599,7 @@ export function ScheduleManagement() {
             onDelete={handleDelete}
             onViewDetail={handleViewDetail}
             onComplete={handleComplete}
+            onEdit={handleEdit}
           />
         </div>
       )}
@@ -1281,6 +1614,32 @@ export function ScheduleManagement() {
               setSelectedSchedule(null)
               setSubscriberDetail(sub)
             }}
+            onEdit={async () => {
+              if (selectedSchedule.isMandatory) {
+                setToast({ message: '기본 일정의 경우 의무이행 일정은 수정 불가합니다.', type: 'error' })
+              } else {
+                const id = Number(selectedSchedule.id)
+                if (!isNaN(id)) {
+                  try {
+                    const detail = await getScheduleDcDetail(id)
+                    setEditingSchedule(convertDetailToSchedule(detail))
+                  } catch {
+                    setEditingSchedule(selectedSchedule)
+                  }
+                } else {
+                  setEditingSchedule(selectedSchedule)
+                }
+                setSelectedSchedule(null)
+              }
+            }}
+            onComplete={() => {
+              handleComplete(selectedSchedule.id)
+              setSelectedSchedule(null)
+            }}
+            onDelete={() => {
+              handleDelete(selectedSchedule.id)
+              setSelectedSchedule(null)
+            }}
           />
         )}
       </Modal>
@@ -1291,6 +1650,17 @@ export function ScheduleManagement() {
           onClose={() => setShowAddModal(false)}
           onAdd={handleAdd}
         />
+      </Modal>
+
+      {/* 일정 수정 모달 */}
+      <Modal open={!!editingSchedule} onClose={() => setEditingSchedule(null)}>
+        {editingSchedule && (
+          <EditModalContent
+            schedule={editingSchedule}
+            onClose={() => setEditingSchedule(null)}
+            onEdit={handleEditSubmit}
+          />
+        )}
       </Modal>
 
       {/* 가입자 상세보기 모달 */}
