@@ -416,6 +416,21 @@ export async function deleteScheduleDc(id: number): Promise<void> {
   if (!res.ok) throw new Error(await readError(res, '일정 삭제 실패'))
 }
 
+export async function updateScheduleDc(id: number, data: {
+  title: string
+  due_date: string
+  description?: string
+  employee_ids?: number[]
+}): Promise<ScheduleDcDetail> {
+  const res = await fetch(`${API_BASE}/dc/schedules/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 수정 실패'))
+  return res.json()
+}
+
 export async function completeScheduleDc(id: number): Promise<ScheduleDcDetail> {
   const res = await fetch(`${API_BASE}/dc/schedules/${id}/complete`, {
     method: 'PATCH',
@@ -543,6 +558,21 @@ export async function deleteScheduleDb(id: number): Promise<void> {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(await readError(res, '일정 삭제 실패'))
+}
+
+export async function updateScheduleDb(id: number, data: {
+  title: string
+  due_date: string
+  description?: string
+  employee_ids?: number[]
+}): Promise<ScheduleDbDetail> {
+  const res = await fetch(`${API_BASE}/db/schedules/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(authHeaders() as Record<string, string>) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(await readError(res, '일정 수정 실패'))
+  return res.json()
 }
 
 export async function completeScheduleDb(id: number): Promise<ScheduleDbDetail> {
