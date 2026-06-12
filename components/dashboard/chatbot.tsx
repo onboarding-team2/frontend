@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { authHeaders } from '@/lib/api'
 import {
   X, Send, Bot, User, Sparkles, FileText, Download,
-  ChevronDown, Minimize2, Maximize2, Expand, Shrink,
+  ChevronDown, Minimize2, Maximize2,
 } from 'lucide-react'
 
 interface Message {
@@ -397,18 +397,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {!isMinimized && (
-              <button
-                type="button"
-                title={isExpanded ? '창 크기 줄이기' : '전체화면으로 보기'}
-                onClick={handleToggleExpanded}
-                className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
-              >
-                {isExpanded
-                  ? <Shrink className="w-4 h-4 text-muted-foreground" />
-                  : <Expand className="w-4 h-4 text-muted-foreground" />}
-              </button>
-            )}
             <button
               type="button"
               title={isMinimized ? '창 열기' : '창 접기'}
@@ -577,9 +565,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                   <Send className="w-5 h-5" />
                 </Button>
               </form>
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                i-ONE Bank 기업 퇴직연금 AI 상담
-              </p>
             </div>
           </>
         )}
