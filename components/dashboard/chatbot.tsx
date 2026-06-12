@@ -282,6 +282,21 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     let answer = ''
     let pendingLine = ''
     let intent: ChatIntent | undefined
+    let hasFirstChunk = false
+
+    const slowResponseTimer = window.setTimeout(() => {
+      if (!hasFirstChunk) {
+        appendBotMessage(
+          botMessageId,
+          '정확한 답변을 위해 관련 자료를 확인하고 있습니다.',
+          undefined,
+          undefined,
+          undefined,
+          intent,
+        )
+        setIsTyping(false)
+      }
+    }, 2500)
 
     try {
       const response = await fetch(CHAT_STREAM_URL, {
@@ -314,6 +329,8 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             if (answer.trim()) appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
           }
           if (payload.t) {
+            hasFirstChunk = true
+            window.clearTimeout(slowResponseTimer)
             answer += payload.t
             appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
             setIsTyping(false)
@@ -328,8 +345,19 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       if (pendingLine.trim()) {
         const payload = JSON.parse(pendingLine.trim().replace(/^data:\s*/, ''))
         if (payload.meta) intent = normalizeIntent(payload.meta.intent)
-        if (payload.t) answer += payload.t
-        appendBotMessage(botMessageId, answer, payload.sources, userMessage, undefined, intent)
+        if (payload.t) {
+          hasFirstChunk = true
+          window.clearTimeout(slowResponseTimer)
+          answer += payload.t
+        }
+        appendBotMessage(
+          botMessageId,
+          answer,
+          payload.sources,
+          userMessage,
+          undefined,
+          intent,
+        )
       }
 
       if (!answer.trim()) {
@@ -342,6 +370,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         'AI 서버와 연결하지 못했습니다. AI 서버가 실행 중인지, NEXT_PUBLIC_CHAT_STREAM_URL 설정이 맞는지 확인해주세요.',
       )
     } finally {
+      window.clearTimeout(slowResponseTimer)
       setIsTyping(false)
     }
   }
@@ -465,7 +494,9 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                         {message.attachments.map((attachment, i) => (
                           <a
                             key={i}
-                            href={attachment.url}
+                            href={toSafeHref(attachment.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="flex items-center gap-2 p-3 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all duration-300 text-left border border-primary/20 hover:shadow-md"
                           >
                             <FileText className="w-4 h-4 text-primary" />
