@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight, Wallet } from 'lucide-react'
+import { Building2, LayoutDashboard, Users, CalendarDays, FileText, LogOut, ChevronRight, Wallet, HelpCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { TabType } from '@/lib/types'
 import { useEffect, useState } from 'react'
@@ -22,6 +22,7 @@ const dcMenuItems = [
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
   { id: 'schedules' as TabType, label: '기일 관리', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
+  { id: 'faq' as TabType, label: 'FAQ', icon: HelpCircle },
 ]
 
 const dbMenuItems = [
@@ -30,6 +31,7 @@ const dbMenuItems = [
   { id: 'members' as TabType, label: '가입자 관리', icon: Users },
   { id: 'schedules' as TabType, label: '기일 도래', icon: CalendarDays },
   { id: 'documents' as TabType, label: '양서식', icon: FileText },
+  { id: 'faq' as TabType, label: 'FAQ', icon: HelpCircle },
 ]
 
 export function Sidebar({ activeTab, setActiveTab, planType }: SidebarProps) {

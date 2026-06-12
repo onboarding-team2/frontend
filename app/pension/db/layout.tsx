@@ -39,6 +39,8 @@ function DBSidebar() {
     ? 'documents'
     : pathname.endsWith('/assets')
     ? 'assets'
+    : pathname.endsWith('/faq')
+    ? 'faq'
     : 'overview'
 
   const handleTabChange = (tab: TabType) => {

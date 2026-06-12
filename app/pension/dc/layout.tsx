@@ -37,6 +37,8 @@ function DCSidebar() {
     ? 'schedules'
     : pathname.endsWith('/documents')
     ? 'documents'
+    : pathname.endsWith('/faq')
+    ? 'faq'
     : 'overview'
 
   const handleTabChange = (tab: TabType) => {
