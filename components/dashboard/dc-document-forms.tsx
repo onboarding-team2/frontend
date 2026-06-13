@@ -190,7 +190,7 @@ export function DocumentForms() {
                 key={doc.id} 
                 className="glass border-0 card-interactive"
               >
-                <CardContent className="p-5">
+                <CardContent className="px-5 py-2">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110">
                       <FileText className="w-6 h-6 text-primary" />
