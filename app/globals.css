@@ -1,6 +1,13 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@font-face {
+  font-family: 'Recipekorea';
+  src: url('/fonts/Recipekorea.otf') format('opentype');
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -54,7 +61,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Pretendard', 'Geist', 'Geist Fallback', system-ui, sans-serif;
+  --font-sans: 'Pretendard Variable', 'Pretendard', 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

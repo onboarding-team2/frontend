@@ -14,7 +14,7 @@ import {
   MessageCircle,
   TrendingUp,
   Users,
-  Shield,
+  CalendarDays,
   ArrowRight,
 } from 'lucide-react'
 
@@ -93,20 +93,27 @@ export default function LoginPage() {
         
         {/* LEFT SECTION */}
         <div className="hidden lg:flex flex-col gap-6 min-w-0">
-          <div className="flex items-center gap-4 mb-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/login/ibk-logo.svg" alt="IBK 로고" className="w-12 h-12 object-contain drop-shadow-md" />
-            <h2 className="text-xl font-bold text-foreground">IBK 기업은행</h2>
-            <span className="text-sm font-semibold text-primary ml-1">AI 기반</span>
+          {/* 연금 ON 로고 */}
+          <div className="flex items-center gap-2.5">
+            <span
+              className="text-4xl xl:text-5xl text-foreground drop-shadow-sm leading-[0.85]"
+              style={{ fontFamily: "'Recipekorea', sans-serif" }}
+            >
+              연금
+            </span>
+            <div className="relative inline-flex items-center gap-1.5 pl-3.5 pr-1 py-1 rounded-full bg-gradient-to-br from-primary to-accent shadow-md shadow-primary/30 -translate-y-[5px]">
+              <span className="text-white font-black text-xl xl:text-2xl tracking-tight leading-none">
+                ON
+              </span>
+              <span className="w-7 h-7 xl:w-8 xl:h-8 rounded-full bg-white shadow-sm shrink-0" />
+            </div>
           </div>
 
-          <div className="space-y-3 -mt-4">
-            <h1 className="text-[36px] xl:text-[44px] font-black leading-[1.05] tracking-tight text-foreground">
-              스마트 퇴직연금
-              <br />
-              관리 시스템
+          <div className="space-y-3">
+            <h1 className="text-[22px] xl:text-[26px] font-bold leading-snug tracking-tight text-foreground">
+              스마트 퇴직연금 관리 시스템
             </h1>
-            <p className="text-sm xl:text-base text-muted-foreground leading-relaxed pt-1">
+            <p className="text-sm xl:text-base text-muted-foreground leading-relaxed">
               DC/DB형 퇴직연금을 한눈에 관리하고,
               <br />
               AI 챗봇으로 실시간 상담받으세요.
@@ -118,11 +125,11 @@ export default function LoginPage() {
             <FeatureCard icon={MessageCircle} title="AI 챗봇" desc="24시간 상담" tone="accent" />
             <FeatureCard icon={TrendingUp} title="현황 관리" desc="통계 및 모니터링" tone="primary" />
             <FeatureCard icon={Users} title="가입자 관리" desc="회원 관리" tone="sky" />
-            <FeatureCard icon={Shield} title="기일 알림" desc="자동 알림" tone="indigo" />
+            <FeatureCard icon={CalendarDays} title="기일 관리" desc="일정 안내" tone="indigo" />
           </div>
 
-          {/* AI 챗봇 배너 */}
-          <div className="group relative rounded-3xl overflow-hidden shadow-[0_20px_50px_-20px_rgba(37,99,235,0.4)] hover:shadow-[0_25px_60px_-20px_rgba(37,99,235,0.55)] hover:-translate-y-0.5 transition-all duration-300 h-[140px]">
+          {/* AI 챗봇 안내 배너 */}
+          <div className="relative rounded-3xl overflow-hidden shadow-[0_20px_50px_-20px_rgba(37,99,235,0.4)] h-[140px]">
             <div className="absolute inset-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -133,18 +140,18 @@ export default function LoginPage() {
               <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-transparent to-transparent" />
             </div>
 
-            <div className="relative h-full flex items-center justify-between px-6 py-4 gap-4">
+            <div className="relative h-full flex items-center px-6 py-4">
               <div className="min-w-0">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white text-[10px] font-medium mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                  지금 응답 가능
+                </div>
                 <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md">
                   AI 챗봇이 24시간 함께합니다
                 </h3>
                 <p className="text-white/90 text-xs mt-1 drop-shadow">
                   복잡한 문의도 쉽고 빠르게 해결해드려요
                 </p>
-                <button className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/95 hover:bg-white text-primary text-xs font-semibold transition-all hover:scale-105 shadow-md">
-                  AI 챗봇 상담하기
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
           </div>

@@ -819,19 +819,19 @@ function SimPane() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <Card className="glass border-0 bg-gradient-to-br from-primary/15 to-accent/5 animate-slide-up">
-          <CardContent className="p-4 h-full flex flex-col justify-center">
-            <p className="text-[15.5px] text-muted-foreground mb-2">예상 연 수익률</p>
-            <div className="flex items-end gap-3 flex-wrap">
-              <p className="text-5xl font-bold gradient-text leading-none">{expReturn}</p>
-            </div>
-            <p className="text-[13.5px] text-muted-foreground mt-3">선택 상품 연 수익률 가중 기준</p>
+          <CardContent className="px-6 py-5 h-full flex flex-col justify-center">
+            <p className="text-[13.5px] text-muted-foreground mb-1">예상 연 수익률</p>
+            <p className="text-5xl font-bold bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent leading-none">
+              {expReturn}
+            </p>
+            <p className="text-[12px] text-muted-foreground mt-2.5">선택 상품 연 수익률 가중 기준</p>
           </CardContent>
         </Card>
 
-        <Card className="glass border-0 lg:col-span-3 animate-slide-up">
-          <CardHeader className="pb-1 px-4 pt-3">
+        <Card className="glass border-0 lg:col-span-4 animate-slide-up">
+          <CardHeader className="pb-1 px-6 pt-1">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <CardTitle className="text-[17.5px] flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
@@ -953,34 +953,36 @@ function SimPane() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pt-1 pb-3">
-            <div className="grid grid-cols-4 items-center gap-3">
-              {/* col 1: 파이차트 */}
-              <div className="h-[150px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={60} paddingAngle={2} stroke="none">
-                      {pieData.map((d, i) => (
-                        <Cell key={i} fill={d.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+          <CardContent className="px-6 pt-1 pb-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {/* 파이차트 */}
+                <div className="h-[150px] w-[150px] shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={60} paddingAngle={2} stroke="none">
+                        {pieData.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                {/* 범례 */}
+                <div className="space-y-1.5 shrink-0">
+                  {pieData.map((d) => (
+                    <div key={d.name} className="flex items-center gap-2 text-[15px] text-muted-foreground whitespace-nowrap">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+                      <span>{d.name} {d.value}%</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              {/* col 2: 범례 */}
-              <div className="space-y-1.5">
-                {pieData.map((d) => (
-                  <div key={d.name} className="flex items-center gap-2 text-[15px] text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
-                    <span className="truncate">{d.name} {d.value}%</span>
-                  </div>
-                ))}
-              </div>
-              {/* col 3-4: 경고/적정 카드 2개 */}
-              <div className="col-span-2 space-y-2">
+              {/* 경고/적정 카드 2개 */}
+              <div className="w-full max-w-[480px] space-y-2">
                 {riskSum > 70 ? (
-                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-red-50 to-rose-50/40 border border-red-200/60">
+                  <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-50 to-rose-50/40 border border-red-200/60">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-rose-400 flex items-center justify-center shrink-0 mt-0.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-white" />
                     </div>
@@ -990,7 +992,7 @@ function SimPane() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/40 border border-emerald-200/60">
+                  <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/40 border border-emerald-200/60">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3.5 h-3.5 text-white" />
                     </div>
@@ -1001,7 +1003,7 @@ function SimPane() {
                   </div>
                 )}
                 {concMsgs.length > 0 ? (
-                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-200/60">
+                  <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-200/60">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shrink-0 mt-0.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-white" />
                     </div>
@@ -1011,7 +1013,7 @@ function SimPane() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/40 border border-emerald-200/60">
+                  <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/40 border border-emerald-200/60">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3.5 h-3.5 text-white" />
                     </div>
