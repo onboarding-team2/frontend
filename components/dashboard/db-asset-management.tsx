@@ -197,6 +197,13 @@ function CurrentPane() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, period, targetVal])
 
+  const GAP_THRESHOLD = 3
+  const maxOurs = chartData.length ? Math.max(...chartData.map((d) => d.ours)) : 0
+  const minOurs = chartData.length ? Math.min(...chartData.map((d) => d.ours)) : 0
+  const isOutOfRange = targetVal > maxOurs + GAP_THRESHOLD
+  const yMax = isOutOfRange ? maxOurs + 2 : Math.max(maxOurs, targetVal) + 0.5
+  const yMin = Math.min(minOurs, targetVal < minOurs ? targetVal : minOurs) - 0.5
+
   const PERIOD_LABELS: Record<PeriodKey, string> = { '6m': '6개월', '1y': '1년', '3y': '3년' }
 
   return (
@@ -349,20 +356,26 @@ function CurrentPane() {
           <CardContent>
             <div className="flex flex-wrap items-center gap-4 mb-3">
               <Legendish color="#2563eb" label="우리 회사" />
-              <Legendish dashed label={`목표 ${targetVal}%`} />
+              <Legendish dashed label={isOutOfRange ? `목표 ${targetVal}% ↑` : `목표 ${targetVal}%`} />
             </div>
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                  <YAxis domain={[yMin, yMax]} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.95)', fontSize: 12 }}
                     formatter={(v) => [`${v}%`]}
                   />
                   <Line type="monotone" dataKey="ours" name="우리 회사" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: '#2563eb' }} />
-                  <ReferenceLine y={targetVal} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 4" />
+                  <ReferenceLine
+                    y={isOutOfRange ? yMax : targetVal}
+                    stroke="#94a3b8"
+                    strokeWidth={1.5}
+                    strokeDasharray="5 4"
+                    label={isOutOfRange ? { value: `목표 ${targetVal}%`, position: 'insideBottomRight', fontSize: 10, fill: '#94a3b8' } : undefined}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -648,7 +661,17 @@ function SimPane() {
     return items
   }
 
+  const saveBlocked = total !== 100 || riskSum > 70
+
   const handleSave = async () => {
+    if (total !== 100) {
+      setToast(`합계가 ${total}%입니다. 100%로 맞춰야 저장할 수 있습니다.`)
+      return
+    }
+    if (riskSum > 70) {
+      setToast(`위험자산 비중이 ${riskSum}%입니다. 법정 한도(70%)를 초과하면 저장할 수 없습니다.`)
+      return
+    }
     const name = nameDraft.trim() || `포트폴리오 ${saved.length + 1}`
     setSaving(true)
     try {
@@ -664,8 +687,8 @@ function SimPane() {
       setNameDraft('')
       setSaveOpen(false)
       setToast(`'${name}' 저장 완료`)
-    } catch {
-      setToast('저장에 실패했습니다')
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '저장에 실패했습니다')
     } finally {
       setSaving(false)
     }
@@ -723,11 +746,32 @@ function SimPane() {
   }
   const normalize = () => {
     if (!total) return
-    const keys = Object.keys(weights)
+
+    const riskCodes = new Set(classes.filter((c) => c.is_risk).map((c) => c.class_code))
+
+    // 1단계: 전체 비율 유지하며 100%로 비례 축소
+    const scaled: Record<string, number> = {}
+    Object.keys(weights).forEach((k) => { scaled[k] = (weights[k] / total) * 100 })
+
+    // 2단계: 위험자산 합이 70 초과 시 위험자산만 70으로 추가 캡
+    const scaledRiskTotal = Object.entries(scaled)
+      .filter(([k]) => riskCodes.has(k))
+      .reduce((s, [, v]) => s + v, 0)
+
     const next: Weights = {}
-    keys.forEach((k) => (next[k] = Math.round((weights[k] / total) * 100)))
+    if (scaledRiskTotal > 70) {
+      const riskCapFactor = 70 / scaledRiskTotal
+      Object.keys(weights).forEach((k) => {
+        next[k] = Math.round(riskCodes.has(k) ? scaled[k] * riskCapFactor : scaled[k])
+      })
+    } else {
+      Object.keys(weights).forEach((k) => { next[k] = Math.round(scaled[k]) })
+    }
+
+    // 3단계: 반올림 오차 및 위험자산 캡으로 인한 부족분 → 원리금보장형(DEPOSIT)으로 보충
     const diff = 100 - Object.values(next).reduce((s, v) => s + v, 0)
-    next[keys[0]] += diff
+    if (diff !== 0) next['DEPOSIT'] = Math.max(0, (next['DEPOSIT'] || 0) + diff)
+
     setWeights(next)
   }
   const applyPreset = (name: keyof typeof PRESETS_BY_CODE) => {
@@ -828,6 +872,12 @@ function SimPane() {
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
+                      {saveBlocked && (
+                        <div className="mb-2 px-2.5 py-2 rounded-lg bg-red-50 border border-red-200/60 text-[11.5px] text-red-600 space-y-0.5">
+                          {total !== 100 && <p>· 합계가 {total}%입니다. 100%로 맞춰야 저장할 수 있습니다.</p>}
+                          {riskSum > 70 && <p>· 위험자산 비중 {riskSum}%로 법정 한도(70%)를 초과합니다.</p>}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
@@ -836,15 +886,15 @@ function SimPane() {
                           placeholder="포트폴리오 이름 입력"
                           onChange={(e) => setNameDraft(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSave()
+                            if (e.key === 'Enter' && !saveBlocked) handleSave()
                             if (e.key === 'Escape') setSaveOpen(false)
                           }}
                           className="flex-1 px-3 py-2 text-sm rounded-lg border border-white/60 bg-white/70 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                         <button
                           onClick={handleSave}
-                          disabled={saving}
-                          className="flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all disabled:opacity-60 shrink-0"
+                          disabled={saving || saveBlocked}
+                          className="flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg bg-primary text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 shrink-0"
                         >
                           <Check className="w-3.5 h-3.5" />
                           {saving ? '저장 중...' : '저장'}
