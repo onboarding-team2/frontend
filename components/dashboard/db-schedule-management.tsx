@@ -277,7 +277,9 @@ function DetailModalContent({
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">{company.name}</p>
-                    <p className="text-xs text-slate-500">사업자번호: {company.businessNumber}</p>
+                    <p className="text-xs text-slate-500">
+                      사업자번호: {company.businessNumber?.toString().replace(/(\d{3})(\d{2})(\d{5})/, "$1-$2-$3")}
+                    </p>
                   </div>
                 </div>
               ))}
