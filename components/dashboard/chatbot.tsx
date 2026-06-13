@@ -220,7 +220,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
+  const [isCheckingContext, setIsCheckingContext] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -229,18 +229,13 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  useEffect(() => { scrollToBottom() }, [messages])
+  useEffect(() => { scrollToBottom() }, [messages, isTyping, isCheckingContext])
 
   useEffect(() => {
     if (isOpen && inputRef.current) inputRef.current.focus()
   }, [isOpen])
 
-  const handleToggleMinimized = () => setIsMinimized((prev) => !prev)
-
-  const handleToggleExpanded = () => {
-    setIsExpanded((prev) => !prev)
-    setIsMinimized(false)
-  }
+  const handleToggleExpanded = () => setIsExpanded((prev) => !prev)
 
   const appendBotMessage = (
     messageId: string,
@@ -278,6 +273,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
   const sendMessageToAi = async (userMessage: string, history: ChatHistoryPayload[]) => {
     setIsTyping(true)
+    setIsCheckingContext(false)
     const botMessageId = `bot-${Date.now()}`
     let answer = ''
     let pendingLine = ''
@@ -286,13 +282,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
     const slowResponseTimer = window.setTimeout(() => {
       if (!hasFirstChunk) {
-        appendBotMessage(
-          botMessageId,
-          '정확한 답변을 위해 관련 자료를 확인하고 있습니다.',
-          undefined,
-          intent,
-        )
-        setIsTyping(false)
+        setIsCheckingContext(true)
       }
     }, 2500)
 
@@ -329,6 +319,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           if (payload.t) {
             hasFirstChunk = true
             window.clearTimeout(slowResponseTimer)
+            setIsCheckingContext(false)
             answer += payload.t
             appendBotMessage(botMessageId, answer, undefined, intent)
             setIsTyping(false)
@@ -343,6 +334,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         if (payload.t) {
           hasFirstChunk = true
           window.clearTimeout(slowResponseTimer)
+          setIsCheckingContext(false)
           answer += payload.t
         }
         appendBotMessage(
@@ -360,10 +352,11 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       console.error(error)
       appendBotMessage(
         botMessageId,
-        'AI 서버와 연결하지 못했습니다. AI 서버가 실행 중인지, NEXT_PUBLIC_CHAT_STREAM_URL 설정이 맞는지 확인해주세요.',
+        'AI 서버와 연결하지 못했습니다. AI 서버가 실행 중인지 확인해주세요.',
       )
     } finally {
       window.clearTimeout(slowResponseTimer)
+      setIsCheckingContext(false)
       setIsTyping(false)
     }
   }
@@ -392,18 +385,14 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       {/* Chat Window – RIGHT UI: solid white, real shadow, no backdrop */}
       <div
         className={`fixed z-50 flex flex-col transition-all duration-500 ease-out overflow-hidden border border-slate-200/60 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] ${
-          isMinimized
-            ? 'bottom-6 right-6 w-80 h-[68px] rounded-2xl glass-strong'
-            : isExpanded
-              ? 'inset-4 md:inset-6 rounded-3xl bg-white'
-              : 'bottom-6 right-6 w-[420px] h-[650px] rounded-3xl bg-white'
+          isExpanded
+            ? 'inset-4 md:inset-6 rounded-3xl bg-white'
+            : 'bottom-6 right-6 w-[420px] h-[650px] rounded-3xl bg-white'
         } max-h-[calc(100vh-2rem)]`}
-        style={!isMinimized ? { backgroundColor: '#ffffff', opacity: 1 } : undefined}
+        style={{ backgroundColor: '#ffffff', opacity: 1 }}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent shrink-0 transition-all ${
-          isMinimized ? 'border-b-0 h-full' : 'border-b border-slate-100'
-        }`}>
+        <div className="flex items-center justify-between border-b border-slate-100 p-4 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent shrink-0 transition-all">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-blue transition-transform duration-300 hover:scale-105">
               <Bot className="w-5 h-5 text-white" />
@@ -421,13 +410,13 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              title={isMinimized ? '창 열기' : '창 접기'}
-              onClick={handleToggleMinimized}
+              title={isExpanded ? '기본 크기로' : '전체화면'}
+              onClick={handleToggleExpanded}
               className="p-2.5 rounded-xl hover:bg-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
             >
-              {isMinimized
-                ? <Maximize2 className="w-4 h-4 text-muted-foreground" />
-                : <Minimize2 className="w-4 h-4 text-muted-foreground" />}
+              {isExpanded
+                ? <Minimize2 className="w-4 h-4 text-muted-foreground" />
+                : <Maximize2 className="w-4 h-4 text-muted-foreground" />}
             </button>
             <button
               type="button"
@@ -440,8 +429,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           </div>
         </div>
 
-        {!isMinimized && (
-          <>
             {/* Messages */}
             <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
               {messages.map((message, idx) => (
@@ -511,13 +498,32 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl rounded-tl-sm border border-slate-200">
-                    <div className="flex gap-1.5">
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  {isCheckingContext ? (
+                    <div className={`${isExpanded ? 'max-w-[82%]' : 'max-w-[75%]'} rounded-2xl rounded-tl-sm border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-sm`}>
+                      <div className="flex items-start gap-3">
+                        <span className="relative mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
+                          <span className="absolute h-3 w-3 rounded-full bg-primary/30 animate-ping" />
+                          <span className="relative h-2 w-2 rounded-full bg-primary" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm leading-relaxed text-foreground">
+                            정확한 답변을 위해 관련 자료를 확인하고 있습니다.
+                          </p>
+                          <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200">
+                            <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/50" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 rounded-2xl rounded-tl-sm border border-slate-200">
+                      <div className="flex gap-1.5">
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -571,8 +577,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                 </Button>
               </form>
             </div>
-          </>
-        )}
       </div>
     </>
   )
