@@ -15,7 +15,6 @@ import {
   MemberDetailError,
   MemberProfileHeader,
   fmtDate,
-  fmtWon,
 } from '@/components/dashboard/member-detail'
 
 function isDefaultSelected(value: unknown) {
@@ -88,7 +87,6 @@ export default function DCMemberDetailPage() {
             label="IRP 계좌"
             value={<StatusBadge ok={r?.hasIrpAccount === 'Y'} okLabel="보유" noLabel="미보유" />}
           />
-          <InfoField label="적립금" value={fmtWon(r?.balance)} />
         </InfoCard>
       </div>
 

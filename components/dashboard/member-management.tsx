@@ -19,6 +19,9 @@ interface Member {
   rrnMasked: string
   position: string
   joinDate: string
+  minContribution: number | null
+  contribution: number | null
+  contributionPaid: boolean | null
   status: '재직' | '퇴직'
 }
 
@@ -48,8 +51,16 @@ function toMember(item: MemberPage['members'][0]): Member {
     rrnMasked: item.rrnMasked ?? '-',
     position: item.position ?? '-',
     joinDate: item.joinDate ?? '-',
+    minContribution: item.minContribution,
+    contribution: item.contribution,
+    contributionPaid: item.contributionPaid,
     status: item.status === '퇴직' ? '퇴직' : '재직',
   }
+}
+
+function fmtWon(value: number | null): string {
+  if (value == null) return '-'
+  return `${value.toLocaleString()}원`
 }
 
 function toggle(list: string[], value: string): string[] {
@@ -272,7 +283,7 @@ export function MemberManagement({ plan }: { plan: PlanType }) {
           <div className="overflow-x-auto rounded-xl border border-slate-200/70">
             <table className="w-full">
               <thead>
-                <tr className="bg-slate-50/60">
+                <tr className="bg-slate-50/60 border-b border-slate-200/70">
                   <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">이름</th>
                   <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">생년월일</th>
                   <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">구분</th>

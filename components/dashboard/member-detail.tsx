@@ -21,7 +21,7 @@ export function InfoField({ label, value }: { label: string; value: React.ReactN
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="text-base font-semibold text-foreground">{value}</p>
+      <p className="text-base font-medium text-foreground">{value}</p>
     </div>
   )
 }
@@ -102,7 +102,7 @@ export function MemberProfileHeader({
   planType?: string | null
 }) {
   return (
-    <Card className="glass border-0 animate-slide-up">
+    <Card className="glass border-0 py-0 animate-slide-up">
       <CardContent className="p-6">
         <div className="flex items-center gap-5">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-400 flex items-center justify-center shadow-lg">
@@ -138,13 +138,13 @@ export function InfoCard({
   children: React.ReactNode
 }) {
   return (
-    <Card className="glass border-0 animate-slide-up">
-      <CardHeader className="border-b border-white/30">
+    <Card className="glass border-0 py-0 gap-0 animate-slide-up">
+      <CardHeader className="border-b border-white/30 py-4">
         <CardTitle className="text-lg flex items-center gap-2">
           <Icon className="w-5 h-5 text-primary" /> {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6 grid grid-cols-2 gap-x-6 gap-y-5">
+      <CardContent className="px-6 pb-6 pt-0 grid grid-cols-2 gap-x-6 gap-y-5">
         {children}
       </CardContent>
     </Card>
