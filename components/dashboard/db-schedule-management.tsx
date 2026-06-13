@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Calendar, List, Plus, Search, CheckCircle2,
-  XCircle, Clock, Building2, Users, Trash2, X,
+  XCircle, Clock, Building2, Users, Trash2, X, Undo2,
   FileText, User, ChevronLeft, ChevronRight, AlertTriangle, Pencil
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -296,12 +296,21 @@ function DetailModalContent({
               <Pencil className="w-4 h-4" />
             </button>
           )}
-          {onComplete && schedule.status !== '완료' && (
+          {onComplete && (
             <button
               onClick={onComplete}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-semibold hover:bg-emerald-100 transition-colors"
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                schedule.status === '완료'
+                  ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                  : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+              }`}
+              title={schedule.status === '완료' ? '미완료 처리' : '완료 처리'}
             >
-              <CheckCircle2 className="w-4 h-4" />
+              {schedule.status === '완료' ? (
+                <Undo2 className="w-4 h-4" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
             </button>
           )}
           {onDelete && (
@@ -455,6 +464,8 @@ function AddModalContent({
               type="date"
               className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.dueDate ? 'border-red-400' : 'border-slate-200'}`}
               value={form.dueDate}
+              min="1900-01-01"
+              max="2099-12-31"
               onChange={e => f('dueDate', e.target.value)}
             />
             {errors.dueDate && <p className="text-xs text-red-500 mt-1.5">{errors.dueDate}</p>}
@@ -711,6 +722,8 @@ function EditModalContent({
               type="date"
               className={`w-full h-11 px-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-500/30 bg-white/80 transition-all ${errors.dueDate ? 'border-red-400' : 'border-slate-200'}`}
               value={form.dueDate}
+              min="1900-01-01"
+              max="2099-12-31"
               onChange={e => f('dueDate', e.target.value)}
             />
             {errors.dueDate && <p className="text-xs text-red-500 mt-1.5">{errors.dueDate}</p>}
@@ -1043,24 +1056,24 @@ function CalendarView({
                       <p className={`text-xs font-bold truncate ${isCompleted ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{s.title}</p>
                     </div>
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                      {!isCompleted && (
-                        <button
-                          onClick={() => onEdit(s)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
-                          title="수정"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {!isCompleted && (
-                        <button
-                          onClick={() => onComplete(s.id)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                          title="완료 처리"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => onEdit(s)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
+                        title="수정"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onComplete(s.id)}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                          isCompleted
+                            ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+                            : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                        }`}
+                        title={isCompleted ? '미완료 처리' : '완료 처리'}
+                      >
+                        {isCompleted ? <Undo2 className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </button>
                       <button
                         onClick={() => onDelete(s.id)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
@@ -1243,10 +1256,15 @@ export function ScheduleManagement() {
 
   const handleComplete = async (id: string) => {
     try {
-      await completeScheduleDb(Number(id))
-      setSchedules(prev => prev.map(s => s.id === id ? { ...s, status: '완료' as const } : s))
+      const detail = await completeScheduleDb(Number(id))
+      const newStatus = detail.status === 'DONE' ? ('완료' as const) : detail.status === 'OVERDUE' ? ('지연' as const) : ('예정' as const)
+      setSchedules(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
+      setSelectedSchedule(prev => prev && prev.id === id ? { ...prev, status: newStatus } : prev)
       setCalendarRefreshKey(prev => prev + 1)
-      setToast({ message: '처리 완료되었습니다.', type: 'success' })
+      setToast({
+        message: detail.status === 'DONE' ? '처리 완료되었습니다.' : '미완료로 변경되었습니다.',
+        type: 'success',
+      })
     } catch {
       setToast({ message: '완료 처리에 실패했습니다.', type: 'error' })
     }
@@ -1372,15 +1390,17 @@ export function ScheduleManagement() {
               >
                 <Pencil className="w-4 h-4" />
               </button>
-              {!isCompleted && (
-                <button
-                  onClick={() => handleComplete(schedule.id)}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                  title="완료 처리"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={() => handleComplete(schedule.id)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                  isCompleted
+                    ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+                    : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                }`}
+                title={isCompleted ? '미완료 처리' : '완료 처리'}
+              >
+                {isCompleted ? <Undo2 className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+              </button>
               <button
                 onClick={() => handleDelete(schedule.id)}
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
@@ -1508,7 +1528,7 @@ export function ScheduleManagement() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
               <input
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border/70 bg-white/80 backdrop-blur-sm text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                placeholder="일정명, 내용 검색..."
+                placeholder="일정명 검색..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
