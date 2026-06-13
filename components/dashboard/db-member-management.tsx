@@ -156,7 +156,7 @@ export function MemberManagement() {
                 placeholder="이름으로 검색"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-11 h-11 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
+                className="pl-11 h-11 bg-white/50 border-white/50 border border-blue-100/50 rounded-xl input-glow focus:bg-white/80 transition-all"
               />
             </div>
 
@@ -256,31 +256,31 @@ export function MemberManagement() {
           </div>
         </CardHeader>
         <CardContent className="px-6 pb-6 pt-2">
-          <div className="overflow-x-auto rounded-xl border border-white/40">
+          <div className="overflow-x-auto rounded-xl border border-slate-200/70">
             <table className="w-full">
               <thead>
-                <tr className="bg-white/40">
-                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">이름</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">생년월일</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">구분</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">가입일</th>
-                  <th className="text-center px-6 py-4 text-sm font-medium text-muted-foreground">재직여부</th>
+                <tr className="bg-slate-50/60">
+                  <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">이름</th>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">생년월일</th>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">구분</th>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">가입일</th>
+                  <th className="text-center px-6 py-3 text-sm font-medium text-muted-foreground">재직여부</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={`sk-${i}`} className="border-b border-white/20">
-                      <td className="px-6 py-4">
+                    <tr key={`sk-${i}`}>
+                      <td className="px-6 py-3">
                         <div className="flex items-center gap-3">
                           <Skeleton className="w-8 h-8 rounded-lg" />
                           <Skeleton className="h-4 w-20" />
                         </div>
                       </td>
-                      <td className="px-6 py-4"><Skeleton className="h-3.5 w-24" /></td>
-                      <td className="px-6 py-4"><Skeleton className="h-3.5 w-14" /></td>
-                      <td className="px-6 py-4"><Skeleton className="h-3.5 w-24" /></td>
-                      <td className="px-6 py-4 text-center"><Skeleton className="h-6 w-14 mx-auto rounded-lg" /></td>
+                      <td className="px-6 py-3"><Skeleton className="h-3.5 w-24" /></td>
+                      <td className="px-6 py-3"><Skeleton className="h-3.5 w-14" /></td>
+                      <td className="px-6 py-3"><Skeleton className="h-3.5 w-24" /></td>
+                      <td className="px-6 py-3 text-center"><Skeleton className="h-6 w-14 mx-auto rounded-lg" /></td>
                     </tr>
                   ))
                 ) : members.length === 0 ? (
@@ -292,9 +292,9 @@ export function MemberManagement() {
                     <tr
                       key={member.id}
                       onClick={() => router.push(`/pension/db/members/${member.id}`)}
-                      className="border-b border-white/20 cursor-pointer hover:bg-primary/10 transition-colors duration-200"
+                      className="cursor-pointer hover:bg-primary/10 transition-colors duration-200"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                             <span className="text-xs font-semibold text-primary">{member.name.charAt(0)}</span>
@@ -302,10 +302,10 @@ export function MemberManagement() {
                           <span className="font-medium text-foreground">{member.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{formatRrnAsBirthDate(member.rrnMasked)}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{member.position}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{member.joinDate}</td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-3 text-sm text-muted-foreground">{formatRrnAsBirthDate(member.rrnMasked)}</td>
+                      <td className="px-6 py-3 text-sm text-muted-foreground">{member.position}</td>
+                      <td className="px-6 py-3 text-sm text-muted-foreground">{member.joinDate}</td>
+                      <td className="px-6 py-3 text-center">
                         <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
                           member.status === '재직' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'
                         }`}>
