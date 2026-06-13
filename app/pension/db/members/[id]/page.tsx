@@ -82,7 +82,7 @@ export default function DBMemberDetailPage() {
         </InfoCard>
       </div>
 
-      <AnnualSalaryCard salaries={detail.annualSalaries} />
+      <AnnualSalaryCard salaries={detail.annualSalaries} startDate={r?.startDate} />
     </div>
   )
 }
