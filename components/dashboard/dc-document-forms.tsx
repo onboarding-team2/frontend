@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {ChatBot} from '@/components/dashboard/chatbot'
 import { Search, FileText, Download, ExternalLink, Folder, ChevronRight, Sparkles } from 'lucide-react'
+
 
 interface Document {
   id: string
@@ -60,6 +62,7 @@ const getFileTypeStyle = (type: Document['fileType']) => {
 export function DocumentForms() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [isBotOpen, setIsBotOpen] = useState(false)
 
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch = doc.name.includes(searchTerm) || doc.description.includes(searchTerm)
@@ -200,13 +203,14 @@ export function DocumentForms() {
                 </p>
               </div>
             </div>
-            <Button className="btn-hover bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white gap-2 shrink-0 px-6 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
+            <Button onClick={() => setIsBotOpen(true)} className="btn-hover bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white gap-2 shrink-0 px-6 shadow-lg glow-blue transition-all duration-300 hover:scale-105 active:scale-95">
               챗봇 상담하기
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </CardContent>
       </Card>
+      <ChatBot isOpen={isBotOpen} onClose={() => setIsBotOpen(false)} />
     </div>
   )
 }
