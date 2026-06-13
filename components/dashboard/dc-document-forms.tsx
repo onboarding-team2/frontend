@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, FileText, Download, ExternalLink, Folder, ChevronRight, Sparkles } from 'lucide-react'
+import { Search, FileText, Download, ExternalLink, Folder, ChevronRight, Sparkles, ChevronLeft } from 'lucide-react'
 import { useChat } from '@/lib/chat-context'
 
 interface Document {
@@ -49,6 +49,8 @@ const documents: Document[] = [
   { id: '22', name: '계약해지 신청서 [DB, DC, 기업형IRP]', description: '퇴직연금 제도 자체를 해지하고자 할 때 제출하는 서류', category: 'withdrawal', fileType: 'zip', downloadUrl: 'https://www.ibk.co.kr/common/download.ibk?seq=409793&fileName=계약해지 신청서[DB,DC,기업형IRP].zip&fullName=/fup/customer/form/2026031017363628944479967344468.zip&category=AGREE_M_A' },
 ]
 
+const ITEMS_PER_PAGE = 6
+
 const getFileTypeStyle = (type: Document['fileType']) => {
   switch (type) {
     case 'pdf': return 'bg-red-100 text-red-500'
@@ -61,6 +63,7 @@ const getFileTypeStyle = (type: Document['fileType']) => {
 export function DocumentForms() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [currentPage, setCurrentPage] = useState(0)
   const openChat = useChat()
 
   const filteredDocuments = documents.filter((doc) => {
@@ -68,6 +71,24 @@ export function DocumentForms() {
     const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory
     return matchesSearch && matchesCategory
   })
+
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE))
+  const paginatedDocuments = filteredDocuments.slice(
+    currentPage * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE + ITEMS_PER_PAGE,
+  )
+
+  useEffect(() => {
+    setCurrentPage(0)
+  }, [searchTerm, selectedCategory])
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages - 1))
+  }, [totalPages])
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(0, Math.min(page, totalPages - 1)))
+  }
 
   return (
     <div className="space-y-6">
@@ -156,10 +177,15 @@ export function DocumentForms() {
             <p className="text-sm text-muted-foreground">
               총 <span className="text-foreground font-semibold">{filteredDocuments.length}</span>개의 서류
             </p>
+            {filteredDocuments.length > ITEMS_PER_PAGE && (
+              <p className="text-sm text-muted-foreground">
+                {currentPage + 1} / {totalPages}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredDocuments.map((doc, idx) => (
+            {paginatedDocuments.map((doc) => (
               <Card 
                 key={doc.id} 
                 className="glass border-0 card-interactive"
@@ -191,6 +217,40 @@ export function DocumentForms() {
               </Card>
             ))}
           </div>
+
+          {filteredDocuments.length === 0 && (
+            <Card className="glass border-0">
+              <CardContent className="p-8 text-center text-sm text-muted-foreground">
+                조건에 맞는 서류가 없습니다. 검색어 또는 카테고리를 다시 확인해 주세요.
+              </CardContent>
+            </Card>
+          )}
+
+          {filteredDocuments.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-center gap-2 pt-2 animate-slide-up">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 0}
+                onClick={() => goToPage(currentPage - 1)}
+                className="border-white/50 bg-white/30 disabled:opacity-40"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                {currentPage + 1} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages - 1}
+                onClick={() => goToPage(currentPage + 1)}
+                className="border-white/50 bg-white/30 disabled:opacity-40"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
