@@ -92,7 +92,7 @@ export function DocumentForms() {
               placeholder="서류 이름 또는 설명으로 검색"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-11 h-12 bg-white/50 border-white/50 rounded-xl input-glow focus:bg-white/80 transition-all"
+              className="pl-11 h-12 bg-white/50 border-white/50 border border-blue-100/50 rounded-xl input-glow focus:bg-white/80 transition-all"
             />
           </div>
           <button

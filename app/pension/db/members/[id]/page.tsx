@@ -4,17 +4,14 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, IdCard, Wallet, TrendingUp } from 'lucide-react'
+import { ArrowLeft, IdCard, Wallet } from 'lucide-react'
 import { getDbMemberDetail, EmployeeDetail } from '@/lib/api'
+import { AnnualSalaryCard } from '@/components/dashboard/annual-salary-card'
 import { formatRrnAsBirthDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 
 function fmtDate(value: string | null | undefined) {
   return value && value.length > 0 ? value : '-'
-}
-
-function fmtWon(value: number | null | undefined) {
-  return value != null ? `${value.toLocaleString()}원` : '-'
 }
 
 function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
@@ -188,39 +185,7 @@ export default function DBMemberDetailPage() {
       </div>
 
       {/* 연도별 연봉 */}
-      <Card className="glass border-0 overflow-hidden animate-slide-up">
-        <CardHeader className="border-b border-white/30">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" /> 연도별 연봉
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-6 pb-6 pt-2">
-          <div className="overflow-x-auto rounded-xl border border-white/40">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-white/40">
-                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">연도</th>
-                  <th className="text-right px-6 py-4 text-sm font-medium text-muted-foreground">연봉</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.annualSalaries.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="p-8 text-center text-sm text-muted-foreground">연봉 정보가 없습니다.</td>
-                  </tr>
-                ) : (
-                  detail.annualSalaries.map((s) => (
-                    <tr key={s.year} className="border-b border-white/20">
-                      <td className="px-6 py-4 text-sm text-foreground">{s.year}</td>
-                      <td className="px-6 py-4 text-sm text-right font-medium text-foreground">{fmtWon(s.salary)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <AnnualSalaryCard salaries={detail.annualSalaries} />
     </div>
   )
 }
