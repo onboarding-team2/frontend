@@ -62,9 +62,7 @@ export function CompanyDetailView() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold text-foreground">{detail.companyName}</h2>
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              isDc ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'
-            }`}>
+            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold bg-primary/15 text-primary border border-primary/20 whitespace-nowrap">
               {detail.planType}형
             </span>
           </div>
