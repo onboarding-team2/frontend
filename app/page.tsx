@@ -225,11 +225,6 @@ export default function LoginPage() {
                     )}
                   </Button>
 
-                  <div className="flex items-center text-xs pt-0.5">
-                    <button type="button" className="text-primary hover:text-primary/80 transition-colors">
-                      비밀번호 찾기
-                    </button>
-                  </div>
                 </form>
 
                 {/* 하단 챗봇 인포 칩 */}
