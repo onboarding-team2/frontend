@@ -148,6 +148,8 @@ function mapMember(item: Record<string, unknown>): Employee {
     hasIrpAccount: ((item.hasIrpAccount ?? item.has_irp_account) as string) ?? null,
     defaultOption: ((item.defaultOption ?? item.default_option) as string) ?? null,
     balance: (item.balance as number) ?? null,
+    minContribution: (item.minContribution as number) ?? null,
+    contribution: (item.contribution as number) ?? null,
     contributionPaid: (item.contributionPaid as boolean) ?? null,
     status: (item.status as EmployeeStatus) ?? null,
   }
@@ -240,6 +242,8 @@ export type Employee = {
   hasIrpAccount: string | null
   defaultOption: string | null
   balance: number | null
+  minContribution: number | null
+  contribution: number | null
   contributionPaid: boolean | null
   status: EmployeeStatus | null
 }
@@ -267,7 +271,7 @@ export type EmployeeDetail = {
     balance: number | null
     status: EmployeeStatus | null
   } | null
-  annualSalaries: { year: string; salary: number }[]
+  annualSalaries: { year: string; salary: number; minContribution: number | null; contribution: number | null }[]
 }
 
 async function readError(res: Response, fallback: string): Promise<string> {
