@@ -15,17 +15,10 @@ interface Message {
   content: string
   timestamp: Date
   intent?: ChatIntent
-  relatedQuestions?: string[]
   attachments?: { name: string; url: string }[]
 }
 
 type ChatIntent = 'faq' | 'regulation' | 'site_guide' | 'business_query' | 'forms' | 'general' | 'guardrail' | 'unknown'
-
-interface ChatSource {
-  type?: string
-  id?: string
-  title?: string
-}
 
 interface ChatHistoryPayload {
   role: 'user' | 'assistant'
@@ -252,16 +245,10 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const appendBotMessage = (
     messageId: string,
     content: string,
-    sources?: ChatSource[],
-    currentQuestion?: string,
     attachments?: { name: string; url: string }[],
     intent?: ChatIntent,
   ) => {
     setMessages((prev) => {
-      const relatedQuestions = sources
-        ?.filter((s) => s.type === 'FAQ' && s.title && s.title !== currentQuestion)
-        .map((s) => s.title as string)
-
       const existing = prev.find((m) => m.id === messageId)
       if (existing) {
         return prev.map((m) =>
@@ -270,7 +257,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                 ...m,
                 content,
                 intent: intent ?? m.intent,
-                relatedQuestions: relatedQuestions ?? m.relatedQuestions,
                 attachments: attachments ?? m.attachments,
               }
             : m,
@@ -284,7 +270,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           content,
           timestamp: new Date(),
           intent,
-          relatedQuestions,
           attachments,
         },
       ]
@@ -304,8 +289,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         appendBotMessage(
           botMessageId,
           '정확한 답변을 위해 관련 자료를 확인하고 있습니다.',
-          undefined,
-          undefined,
           undefined,
           intent,
         )
@@ -341,17 +324,14 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           const payload = JSON.parse(line)
           if (payload.meta) {
             intent = normalizeIntent(payload.meta.intent)
-            if (answer.trim()) appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
+            if (answer.trim()) appendBotMessage(botMessageId, answer, undefined, intent)
           }
           if (payload.t) {
             hasFirstChunk = true
             window.clearTimeout(slowResponseTimer)
             answer += payload.t
-            appendBotMessage(botMessageId, answer, undefined, undefined, undefined, intent)
+            appendBotMessage(botMessageId, answer, undefined, intent)
             setIsTyping(false)
-          }
-          if (payload.sources) {
-            appendBotMessage(botMessageId, answer, payload.sources, userMessage, undefined, intent)
           }
           if (payload.done) break
         }
@@ -368,15 +348,13 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         appendBotMessage(
           botMessageId,
           answer,
-          payload.sources,
-          userMessage,
           undefined,
           intent,
         )
       }
 
       if (!answer.trim()) {
-        appendBotMessage(botMessageId, '응답을 받지 못했습니다. 잠시 후 다시 시도해주세요.', undefined, undefined, undefined, intent)
+        appendBotMessage(botMessageId, '응답을 받지 못했습니다. 잠시 후 다시 시도해주세요.', undefined, intent)
       }
     } catch (error) {
       console.error(error)
@@ -517,25 +495,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                             <FileText className="w-4 h-4 text-primary" />
                             <span className="text-xs text-foreground font-medium">{attachment.name}</span>
                           </a>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 관련 질문 (좌측 AI 응답) */}
-                    {message.relatedQuestions && message.relatedQuestions.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-xs text-muted-foreground text-left">관련 질문</p>
-                        {message.relatedQuestions.map((question, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => handleSuggestionClick(question)}
-                            disabled={isTyping}
-                            className="inline-flex max-w-full items-center gap-2 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-left transition-all duration-300 hover:border-primary/30 hover:bg-primary/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
-                            <span className="truncate text-xs text-foreground">{question}</span>
-                          </button>
                         ))}
                       </div>
                     )}
