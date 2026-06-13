@@ -6,14 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, Filter, Users, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
-import { getDcMemberPage, MemberPage } from '@/lib/api'
+import { getDcMemberPage, getDbMemberPage, MemberPage, MemberQuery } from '@/lib/api'
 import { formatRrnAsBirthDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 
+type PlanType = 'DC' | 'DB'
 type FilterKey = 'status' | 'type' | 'irp' | 'default' | 'contribution'
 
 interface Member {
-  id: string
+  id: number
   name: string
   rrnMasked: string
   position: string
@@ -21,26 +22,28 @@ interface Member {
   status: '재직' | '퇴직'
 }
 
-// label: 팝업 안에서 보이는 짧은 라벨 / chip: 적용된 필터 칩에 보이는 라벨(맥락 포함)
-const FILTER_GROUPS: {
+interface FilterGroup {
   key: FilterKey
   label: string
   options: { value: string; label: string; chip?: string }[]
-}[] = [
+}
+
+const COMMON_GROUPS: FilterGroup[] = [
   { key: 'status', label: '재직여부', options: [{ value: '재직', label: '재직중' }, { value: '퇴직', label: '퇴직' }] },
   { key: 'type', label: '구분', options: [{ value: '사원', label: '사원' }, { value: '임원', label: '임원' }] },
   { key: 'irp', label: 'IRP계좌', options: [{ value: '보유', label: '보유', chip: 'IRP 보유' }, { value: '미보유', label: '미보유', chip: 'IRP 미보유' }] },
+]
+
+const DC_ONLY_GROUPS: FilterGroup[] = [
   { key: 'default', label: '디폴트옵션', options: [{ value: '선정', label: '선정', chip: '디폴트옵션 선정' }, { value: '미선정', label: '미선정', chip: '디폴트옵션 미선정' }] },
   { key: 'contribution', label: '부담금 납입여부', options: [{ value: '납입완료', label: '납입완료', chip: '부담금 납입완료' }, { value: '미납', label: '미납', chip: '부담금 미납' }] },
 ]
 
-const FILTER_KEYS = FILTER_GROUPS.map(g => g.key)
 const PAGE_SIZE = 20
-const PATH = '/pension/dc/members'
 
 function toMember(item: MemberPage['members'][0]): Member {
   return {
-    id: String(item.id),
+    id: item.id,
     name: item.name,
     rrnMasked: item.rrnMasked ?? '-',
     position: item.position ?? '-',
@@ -53,19 +56,21 @@ function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter(v => v !== value) : [...list, value]
 }
 
-export function MemberManagement() {
+export function MemberManagement({ plan }: { plan: PlanType }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const spString = searchParams.toString()
 
-  // URL = 단일 상태 소스
-  const urlFilters: Record<FilterKey, string[]> = {
-    status: searchParams.getAll('status'),
-    type: searchParams.getAll('type'),
-    irp: searchParams.getAll('irp'),
-    default: searchParams.getAll('default'),
-    contribution: searchParams.getAll('contribution'),
-  }
+  const filterGroups = plan === 'DC' ? [...COMMON_GROUPS, ...DC_ONLY_GROUPS] : COMMON_GROUPS
+  const filterKeys = filterGroups.map(g => g.key)
+  const emptyFilters = Object.fromEntries(filterKeys.map(k => [k, [] as string[]])) as Record<FilterKey, string[]>
+  const path = `/pension/${plan.toLowerCase()}/members`
+  const fetchPage = plan === 'DC' ? getDcMemberPage : getDbMemberPage
+
+  // URL을 단일 상태 소스로 사용
+  const urlFilters = Object.fromEntries(
+    filterKeys.map(k => [k, searchParams.getAll(k)])
+  ) as Record<FilterKey, string[]>
   const nameParam = searchParams.get('name') ?? ''
   const page = Math.max(0, parseInt(searchParams.get('page') ?? '0', 10) || 0)
 
@@ -82,16 +87,13 @@ export function MemberManagement() {
   useEffect(() => {
     const ctrl = new AbortController()
     setLoading(true)
-    getDcMemberPage({
+    const query: MemberQuery = {
       name: searchParams.get('name') ?? undefined,
-      status: searchParams.getAll('status'),
-      type: searchParams.getAll('type'),
-      irp: searchParams.getAll('irp'),
-      default: searchParams.getAll('default'),
-      contribution: searchParams.getAll('contribution'),
       page: Math.max(0, parseInt(searchParams.get('page') ?? '0', 10) || 0),
       size: PAGE_SIZE,
-    }, ctrl.signal)
+    }
+    filterKeys.forEach(k => { query[k] = searchParams.getAll(k) })
+    fetchPage(query, ctrl.signal)
       .then(res => { setMembers(res.members.map(toMember)); setTotal(res.totalCount); setTotalPages(res.totalPages) })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -105,7 +107,7 @@ export function MemberManagement() {
         const p = new URLSearchParams(searchParams.toString())
         if (searchInput) p.set('name', searchInput); else p.delete('name')
         p.set('page', '0')
-        router.replace(`${PATH}?${p.toString()}`)
+        router.replace(`${path}?${p.toString()}`)
       }
     }, 300)
     return () => clearTimeout(t)
@@ -114,13 +116,13 @@ export function MemberManagement() {
   const setParams = (mutate: (p: URLSearchParams) => void) => {
     const p = new URLSearchParams(searchParams.toString())
     mutate(p)
-    router.push(`${PATH}?${p.toString()}`)
+    router.push(`${path}?${p.toString()}`)
   }
 
   const openFilter = () => { setPending(urlFilters); setFilterOpen(true) }
   const applyFilter = () => {
     setParams(p => {
-      FILTER_KEYS.forEach(k => { p.delete(k); pending[k].forEach(v => p.append(k, v)) })
+      filterKeys.forEach(k => { p.delete(k); pending[k].forEach(v => p.append(k, v)) })
       p.set('page', '0')
     })
     setFilterOpen(false)
@@ -133,12 +135,12 @@ export function MemberManagement() {
       p.delete(key); vals.forEach(v => p.append(key, v)); p.set('page', '0')
     })
   const clearAll = () =>
-    setParams(p => { FILTER_KEYS.forEach(k => p.delete(k)); p.set('page', '0') })
+    setParams(p => { filterKeys.forEach(k => p.delete(k)); p.set('page', '0') })
   const goPage = (n: number) => setParams(p => p.set('page', String(n)))
 
-  const activeCount = FILTER_KEYS.reduce((s, k) => s + urlFilters[k].length, 0)
+  const activeCount = filterKeys.reduce((s, k) => s + urlFilters[k].length, 0)
   const labelOf = (key: FilterKey, value: string) => {
-    const opt = FILTER_GROUPS.find(g => g.key === key)?.options.find(o => o.value === value)
+    const opt = filterGroups.find(g => g.key === key)?.options.find(o => o.value === value)
     return opt?.chip ?? opt?.label ?? value
   }
 
@@ -166,7 +168,7 @@ export function MemberManagement() {
                 placeholder="이름으로 검색"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-11 h-11 bg-white/50 border-white/50 border border-blue-100/50 rounded-xl input-glow focus:bg-white/80 transition-all"
+                className="pl-11 h-11 bg-white/50 border border-blue-100/50 rounded-xl input-glow focus:bg-white/80 transition-all"
               />
             </div>
 
@@ -192,7 +194,7 @@ export function MemberManagement() {
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)} />
                   <div className="absolute right-0 mt-2 w-72 z-50 rounded-2xl border border-white/40 bg-white/90 backdrop-blur-xl shadow-xl p-4 space-y-4 animate-slide-up">
-                    {FILTER_GROUPS.map((group) => (
+                    {filterGroups.map((group) => (
                       <div key={group.key} className="space-y-2">
                         <p className="text-sm font-semibold text-foreground">{group.label}</p>
                         <div className="flex flex-wrap gap-2">
@@ -217,7 +219,7 @@ export function MemberManagement() {
 
                     <div className="flex items-center justify-between pt-1">
                       <button
-                        onClick={() => setPending({ status: [], type: [], irp: [], default: [], contribution: [] })}
+                        onClick={() => setPending(emptyFilters)}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                       >
                         초기화
@@ -235,7 +237,7 @@ export function MemberManagement() {
           {/* 적용된 필터 칩 */}
           {activeCount > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              {FILTER_GROUPS.flatMap((group) =>
+              {filterGroups.flatMap((group) =>
                 urlFilters[group.key].map((value) => (
                   <span key={`${group.key}-${value}`} className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                     {labelOf(group.key, value)}
@@ -299,10 +301,10 @@ export function MemberManagement() {
                     <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">가입자가 없습니다.</td>
                   </tr>
                 ) : (
-                  members.map((member, idx) => (
+                  members.map((member) => (
                     <tr
                       key={member.id}
-                      onClick={() => router.push(`/pension/dc/members/${member.id}`)}
+                      onClick={() => router.push(`${path}/${member.id}`)}
                       className="cursor-pointer hover:bg-primary/10 transition-colors duration-200"
                     >
                       <td className="px-6 py-3">

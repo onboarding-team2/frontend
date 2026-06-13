@@ -1,10 +1,10 @@
 import { Suspense } from 'react'
-import { MemberManagement } from '@/components/dashboard/db-member-management'
+import { MemberManagement } from '@/components/dashboard/member-management'
 
 export default function DBMembersTab() {
   return (
     <Suspense fallback={null}>
-      <MemberManagement />
+      <MemberManagement plan="DB" />
     </Suspense>
   )
 }
