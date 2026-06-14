@@ -9,8 +9,7 @@ interface HeaderProps {
 
 export function Header({ onChatOpen }: HeaderProps) {
   return (
-    <header className="shadow-md bg-white border-b border-white/30 px-6 py-4 relative z-50 sticky top-0">
-      <div className="flex items-center justify-between">
+      <header className="glass-strong border-b border-white/30 px-6 py-4 relative z-50">      <div className="flex items-center justify-between">
         {/* Mobile Menu */}
         <button className="md:hidden p-2 rounded-lg hover:bg-white/50 transition-colors">
           <Menu className="w-5 h-5" />
